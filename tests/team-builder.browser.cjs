@@ -153,6 +153,13 @@ async function run() {
     await page.click("#selectRecruitmentMembersBtn");
     await page.locator('.member-card[data-index="0"]').click();
     await page.locator('.member-card[data-index="24"]').click();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const dock = await page.evaluate(() => {
+      const rect = document.querySelector("#internalBalanceTeamBtn").getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, count: document.querySelector("#dockSelectedCount").textContent };
+    });
+    assert.ok(dock.top >= 0 && dock.bottom <= 844, "mobile action dock stays on screen at the top of the page");
+    assert.equal(dock.count, "20 / 20명 선택됨");
     await page.click("#internalBalanceTeamBtn");
     await page.waitForSelector("#balanceModal.open");
     assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
@@ -167,9 +174,15 @@ async function run() {
       await page.screenshot({
         path: process.env.TEST_SCREENSHOT_PATH.replace(/\.png$/, "-desktop.png"), animations: "disabled"
       });
+      await page.setViewportSize({ width: 390, height: 844 });
     }
+    await page.click("#balanceModalClose");
+    await page.click('[data-tab="map"]');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    assert.ok(await page.locator("#spinBtn").evaluate(el => el.getBoundingClientRect().bottom <= innerHeight),
+      "map draw button is visible on the first mobile screen");
     assert.deepEqual(errors, []);
-    console.log("PASS: mobile 4-team candidates, no browser JavaScript errors");
+    console.log("PASS: mobile 4-team candidates, sticky action dock, map button on first screen, no JS errors");
   } finally {
     await browser.close();
   }

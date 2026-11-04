@@ -25,13 +25,15 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  font-family: "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Pretendard Variable", "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
     radial-gradient(circle at top left, rgba(124, 92, 255, 0.22), transparent 30%),
     radial-gradient(circle at bottom right, rgba(255, 70, 85, 0.18), transparent 34%),
     linear-gradient(135deg, var(--bg), var(--bg2));
   color: var(--text);
   overflow-x: hidden;
+  /* hidden은 body를 스크롤 컨테이너로 만들어 모바일 하단 편성 바의 sticky를 막으므로, 지원 브라우저에선 clip 사용 */
+  overflow-x: clip;
 }
 
 body {
@@ -89,7 +91,7 @@ body {
 
 .eyebrow {
   margin: 0 0 10px;
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: 0.95rem;
   letter-spacing: 0.32em;
   color: #c2c9dd;
@@ -98,7 +100,7 @@ body {
 
 .hero h1 {
   margin: 0;
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: clamp(2.4rem, 6vw, 4.8rem);
   font-weight: 900;
   letter-spacing: 0.02em;
@@ -187,7 +189,7 @@ body {
 }
 
 .wheel-center span {
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-weight: 900;
   font-size: 1.5rem;
   color: #ff4655;
@@ -223,7 +225,7 @@ body {
 
 #resultText {
   display: block;
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: clamp(2.2rem, 5.5vw, 3.8rem);
   font-weight: 900;
   line-height: 1.1;
@@ -391,7 +393,7 @@ button:disabled {
 /* 맵 이름(영문)엔 발로란트 폰트 */
 .history-chip,
 .used-chip {
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: 1.05rem;
   padding: 0 16px;
 }
@@ -407,7 +409,7 @@ button:disabled {
 }
 
 .map-list-names {
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   letter-spacing: 0.03em;
   font-size: 1.1rem;
 }
@@ -803,7 +805,8 @@ button:disabled {
 /* ===== MEMBER GRID ===== */
 .member-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, …): 띄어쓰기 없는 긴 이름이 한 열만 넓혀 화면 밖으로 밀어내지 않게 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -864,6 +867,9 @@ button:disabled {
   font-weight: 800;
   color: var(--text);
   line-height: 1.2;
+  /* 한글 이름이 "테스" / "트9"처럼 글자 중간에서 끊기지 않게 띄어쓰기 단위로만 줄바꿈 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .member-dept,
@@ -974,6 +980,17 @@ button:disabled {
 .pos-flex       { background: rgba(173, 181, 189, 0.1);  color: #adb5bd; border: 1px solid rgba(173, 181, 189, 0.2); }
 
 /* ===== TEAM ACTION BAR ===== */
+.team-action-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 데스크톱은 필터 영역 배지만 사용, 모바일 하단 바에서만 표시 */
+.dock-selected-count {
+  display: none;
+}
+
 .team-action-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1479,7 +1496,7 @@ button:disabled {
 }
 
 .map-reveal-label {
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   letter-spacing: 0.32em;
   font-size: 1rem;
   color: #ff4655;
@@ -1507,7 +1524,7 @@ button:disabled {
 }
 
 .map-reveal-name {
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: clamp(2.6rem, 8vw, 4.6rem);
   font-weight: 900;
   color: #fff;
@@ -1548,6 +1565,8 @@ button:disabled {
 .team-member-name {
   font-weight: 700;
   font-size: 0.95rem;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .team-member-riot {
@@ -1581,7 +1600,7 @@ button:disabled {
 
 @media (max-width: 1100px) {
   .member-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1613,19 +1632,68 @@ button:disabled {
   }
 
   .member-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 좁은 카드에서는 이름을 위에 크게, 학번은 둘째 줄에 작게 */
+  .member-name {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+  }
+
+  .member-sid {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--muted);
   }
 
   .team-result-grid {
     grid-template-columns: 1fr;
   }
 
-  .team-action-bar {
-    grid-template-columns: 1fr 1fr;
+  /* 멤버 목록을 끝까지 내리지 않아도 선택 인원과 편성 버튼이 보이도록 하단 고정 */
+  .team-action-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    gap: 8px;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+    border: 1px solid var(--card-border);
+    border-radius: 18px 18px 0 0;
+    background: rgba(10, 13, 22, 0.94);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.45);
   }
 
-  .team-action-bar .primary-btn {
-    grid-column: 1 / -1;
+  .dock-selected-count {
+    display: block;
+    align-self: center;
+    text-align: center;
+    white-space: normal;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+  }
+
+  .team-action-bar {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .team-action-bar button {
+    padding: 11px 8px;
+    border-radius: 14px;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    word-break: keep-all;
+  }
+
+  .team-action-dock .team-builder-notice {
+    max-height: 32vh;
+    overflow-y: auto;
+    padding: 10px 12px;
+    font-size: 0.85rem;
   }
 
   .manual-teams-preview {
@@ -1634,10 +1702,6 @@ button:disabled {
 }
 
 @media (max-width: 480px) {
-  .team-action-bar {
-    grid-template-columns: 1fr;
-  }
-
   .manual-teams-preview {
     grid-template-columns: 1fr;
   }
@@ -1729,7 +1793,7 @@ button:disabled {
 }
 
 .exclude-map-name {
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: 1rem;
   font-weight: 800;
   color: #fff;
@@ -1805,7 +1869,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: 1.6rem;
   color: #ff4655;
   transform: translateY(-4px) !important;
@@ -1837,6 +1901,23 @@ button:disabled {
   line-height: 1.7;
 }
 .draw-hint b { color: #ff4655; }
+
+/* 한 열 배치(태블릿·모바일): 빈 카드 영역을 줄이고 맵 뽑기 버튼을 카드 바로 아래로 올려 첫 화면에 보이게 */
+@media (max-width: 980px) {
+  .draw-panel {
+    min-height: auto;
+    padding: 22px;
+    gap: 18px;
+  }
+
+  .draw-stage {
+    min-height: 150px;
+  }
+
+  .info-panel .button-group {
+    order: -1;
+  }
+}
 
 .draw-card {
   perspective: 1200px;
@@ -1879,7 +1960,7 @@ button:disabled {
     linear-gradient(135deg, #1a2133, #0d111c);
 }
 .draw-card-front span {
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: 4.5rem;
   font-weight: 900;
   color: #ff4655;
@@ -1901,7 +1982,7 @@ button:disabled {
   right: 0;
   bottom: 0;
   padding: 20px 14px 16px;
-  font-family: "Valorant", "Pretendard", sans-serif;
+  font-family: "Valorant", "Pretendard Variable", "Pretendard", sans-serif;
   font-size: 2.1rem;
   font-weight: 900;
   letter-spacing: 0.02em;

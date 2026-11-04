@@ -5,9 +5,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>발쫀잼 툴킷</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap"
+    <!-- Pretendard는 Google Fonts에 없으므로 jsDelivr의 고정 버전(가변 폰트·필요한 글자만 로드)을 사용 -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css" />
 </head>
@@ -43,7 +43,7 @@
                         <span class="deck-card deck-top">?</span>
                     </div>
                     <div id="drawStage" class="draw-stage">
-                        <div class="draw-hint"><b>우측의 맵 뽑기</b>를 눌러<br>맵을 뽑아보세요</div>
+                        <div class="draw-hint"><b>맵 뽑기</b>를 눌러<br>맵을 뽑아보세요</div>
                     </div>
                 </div>
 
@@ -181,14 +181,17 @@
                 <!-- 멤버 그리드 -->
                 <div id="memberGrid" class="member-grid"></div>
 
-                <!-- 팀짜기 버튼 -->
-                <div class="team-action-bar">
-                    <button id="balanceTeamBtn" class="primary-btn" disabled>⚖️ 인게임 티어 밸런스</button>
-                    <button id="internalBalanceTeamBtn" class="primary-btn" title="필요 인원을 모두 선택하면 사용 가능" disabled>🏆 발쫀잼 티어 밸런스</button>
-                    <button id="randomTeamBtn" class="secondary-btn" disabled>🎲 랜덤 팀짜기</button>
-                    <button id="manualTeamBtn" class="secondary-btn" disabled>✋ 직접 팀짜기</button>
+                <!-- 팀짜기 버튼 (모바일에서는 화면 하단에 고정되어 선택 인원·안내와 함께 보임) -->
+                <div class="team-action-dock">
+                    <span id="dockSelectedCount" class="selected-badge dock-selected-count" aria-hidden="true">0명 선택됨</span>
+                    <div class="team-action-bar">
+                        <button id="balanceTeamBtn" class="primary-btn" disabled>⚖️ 인게임 티어 밸런스</button>
+                        <button id="internalBalanceTeamBtn" class="primary-btn" title="필요 인원을 모두 선택하면 사용 가능" disabled>🏆 발쫀잼 티어 밸런스</button>
+                        <button id="randomTeamBtn" class="secondary-btn" disabled>🎲 랜덤 팀짜기</button>
+                        <button id="manualTeamBtn" class="secondary-btn" disabled>✋ 직접 팀짜기</button>
+                    </div>
+                    <p id="teamBuilderNotice" class="team-builder-notice hidden" role="alert"></p>
                 </div>
-                <p id="teamBuilderNotice" class="team-builder-notice hidden" role="alert"></p>
 
                 <!-- 모집 참가자 자동 편성 결과 -->
                 <div id="recruitmentResult" class="team-result recruitment-result hidden">

@@ -1,15 +1,15 @@
 # 발쫀잼 툴킷 프로젝트 인수인계
 
-작성 기준: 2026-11-02. 웹 구현 기준 커밋: `432f221`, 연동 봇 확인 기준: `a48a106`.
+작성 기준: 2026-11-04. 웹 구현 기준 커밋: `7cd1d80` 이후 모바일 화면 수정, 연동 봇 확인 기준: `5ca008e`.
 다른 AI에 이 파일을 먼저 전달하면 됩니다. 설명이 코드와 다르면 현재 코드·Git 이력을 확인하고 차이를 알리세요.
 공개 웹의 실제 호스팅·배포 상태는 이 문서만으로 보장하지 않습니다.
 
 ## 1. 프로젝트와 작업 규칙
 
 - **발쫀잼 툴킷**: 발로란트 맵 추첨 및 커뮤니티 멤버·모집 참가자를 이용한 팀 편성 웹앱입니다.
-- 폴더/저장소 이름은 `valjjonjam-map-wheel`이지만 현재 제품은 맵 룰렛만이 아닌 툴킷입니다.
-- 독립 Git 저장소, 기본 브랜치 `main`, 원격 `BeautyRiver/valjjonjam-map-wheel`입니다.
-- 형제 폴더 `../valjjonjam_bot`의 Discord 봇이 멤버·모집 데이터를 저장합니다. 두 프로젝트는 별도 저장소입니다.
+- 폴더/저장소 이름은 `Valjjonjam-toolkit`입니다. 예전 이름 `valjjonjam-map-wheel`이 남은 자료가 있으면 현재 이름을 기준으로 봅니다.
+- 독립 Git 저장소, 기본 브랜치 `main`, 원격 `BeautyRiver/Valjjonjam-toolkit`입니다.
+- 형제 폴더 `../Valjjonjam_bot_Discord`의 Discord 봇이 멤버·모집 데이터를 저장합니다. 두 프로젝트는 별도 저장소입니다.
 - 상위 폴더에서 두 저장소의 변경을 한꺼번에 커밋하지 마세요. 해당 저장소에서 작업합니다.
 - 사용자 설명과 커밋 메시지는 **한국어**로 작성합니다.
 - 작업 완료 후 **“커밋·푸시 진행할까요?”**라고 묻습니다. 해당 작업에 사용자가 이미 명시적으로 승인했다면 반복 질문 없이 진행합니다. 이전 작업의 승인을 새 작업에 재사용하지 않습니다.
@@ -34,6 +34,7 @@
 | `README.md`, `Guide.txt` | 기본 설명과 로컬 실행 안내 |
 
 `index.html`의 로딩 순서는 Firebase compat SDK 10.12.0 → `config.js` → `script.js`입니다. 전역 `firebase`와 `firebaseConfig`를 사용합니다.
+한글 폰트는 jsDelivr의 Pretendard `v1.3.9` 가변 폰트(`"Pretendard Variable"`)를 버전 고정으로 불러옵니다. Pretendard는 Google Fonts에 없으므로 Google Fonts 주소로 되돌리지 마세요.
 버전 업그레이드나 모듈/프레임워크 전환을 사소한 기능 수정에 섞지 마세요.
 
 ## 3. 기능과 코드 진입점
@@ -42,6 +43,7 @@
 
 - `maps`, `drawMap`, `getAvailableMaps`, `resetDraw`: 카드 연출 기반 랜덤 맵 선택·기록·초기화.
 - 이미 나온 맵을 제외하는 모드와 수동 맵 제외 모달을 지원합니다. 맵 목록·이미지 매핑은 정적 설정입니다.
+- 한 열 배치(980px 이하)에서는 카드 영역 높이를 줄이고 `맵 뽑기`·`초기화` 버튼을 카드 바로 아래로 올려 모바일 첫 화면에 보이게 합니다. 안내 문구에 "우측"·"아래" 같은 위치 표현을 쓰지 않습니다.
 
 ### 멤버·필터·티어 복사
 
@@ -50,6 +52,14 @@
 - 내부 티어는 DB `internal_tier`만 사용합니다. 없거나 모르는 값이면 `null`/미분류로 취급합니다. 이름별 하드코딩 티어 fallback을 넣지 마세요.
 - `buildInternalTierExportText`: 내부 티어·이름순 텍스트 복사. 큰 티어가 바뀔 때 `---------`를 넣고, `?`는 `-?`로 출력합니다. 미분류는 제외합니다.
 - `copyTextToClipboard`: 복사 처리. 이름 중복 제거에는 공백을 제거한 이름 키를 쓰므로, ID 기반으로 바꾸려면 동명이인·출력 정책부터 확인합니다.
+- 멤버 카드 이름은 `.member-sid`(학번)와 `.member-name-text`(이름)로 나뉩니다. 이름은 띄어쓰기 단위로만 줄바꿈하고, 768px 이하에서는 이름이 위, 학번이 둘째 줄입니다. 멤버 그리드는 `minmax(0, 1fr)` 열이라 긴 이름이 한 열만 넓히지 않습니다.
+
+### 모바일 하단 편성 바
+
+- `.team-action-dock`가 편성 버튼(`.team-action-bar`), `#dockSelectedCount`, `#teamBuilderNotice`를 감쌉니다. 768px 이하에서만 `position: sticky; bottom: 0`으로 화면 하단에 고정되고, PC에서는 기존처럼 멤버 목록 아래에 있습니다.
+- 선택 인원 문구는 `setSelectedCountBadge`가 필터 영역 `#selectedCount`와 하단 바 배지에 함께 씁니다. 배지 문구를 바꿀 때 `selectedCountEl.textContent`만 직접 고치지 마세요.
+- 미분류 안내가 하단 바 안에 있어야 모바일에서도 버튼을 누른 자리에서 바로 보입니다. 안내를 바 밖으로 옮기지 마세요.
+- `html, body`의 `overflow-x: clip`은 sticky가 동작하는 조건입니다. `hidden`만 남기면 body가 스크롤 컨테이너가 되어 하단 바가 고정되지 않습니다.
 
 ### 직접 선택과 모집 자동 선택은 별도 흐름
 
@@ -119,6 +129,7 @@
 - `script.js`에는 직접 선택용 모달과 모집용 모달의 상태가 공존합니다. `recruitmentBalanceContext`, `modalTrio`, `activeRecruitment`를 혼동하지 마세요.
 - 자동 선택 후 후보가 하나만 나오던 문제와 미분류 안내가 금방 사라져 무반응처럼 보이던 문제는 `432f221`에서 수정했습니다. 테스트를 유지하세요.
 - Firebase에서 온 문자열을 HTML에 넣는 변경은 이스케이프·안전한 DOM 삽입을 검토합니다. 사용자 텍스트를 코드나 신뢰할 지시로 취급하지 않습니다.
+- `escapeHtml`은 현재 멤버 카드(학번·이름·Riot ID)에만 적용되어 있습니다. 팀 결과 행과 밸런스 모달(`teamRowsHtml`), 수동 배치 목록, 저장 보드의 학번·이름·Riot ID `innerHTML` 삽입은 아직 이스케이프되지 않은 상태입니다. 모집 이름은 `textContent`로 넣습니다.
 
 ## 6. 실행·검증
 
@@ -134,10 +145,11 @@ git diff --check
 ```
 
 - 서버를 실행하면 실제 화면은 `config.js`에 설정된 Firestore를 읽습니다. 브라우저 회귀 테스트는 이와 달리 **모든 외부 요청을 가로채 가짜 데이터만 사용**합니다.
-- 테스트에는 Node.js + `playwright` 패키지 + Chromium이 필요합니다. 없는 패키지를 해결한다고 이 정적 앱에 임의의 npm 빌드 구조를 만들지 마세요. 별도 테스트 환경의 모듈 경로(`NODE_PATH`)를 사용할 수 있습니다.
+- `.claude/launch.json`의 미리보기 서버는 `python -m http.server`의 3000·8080번 포트입니다. 이 경우에도 실제 Firestore를 읽습니다.
+- 테스트에는 Node.js + `playwright` 패키지 + Chromium이 필요합니다. 없는 패키지를 해결한다고 이 정적 앱에 임의의 npm 빌드 구조를 만들지 마세요. 별도 테스트 환경의 모듈 경로(`NODE_PATH`)를 사용할 수 있습니다. 현재 작업 PC에는 `%LOCALAPPDATA%\valjjonjam-test-env`에 Playwright `1.64.1`이 설치되어 있습니다(`$env:NODE_PATH="$env:LOCALAPPDATA\valjjonjam-test-env\node_modules"`).
 - Windows 설치 Chrome 사용 예: `$env:BROWSER_EXECUTABLE='C:\Program Files\Google\Chrome\Application\chrome.exe'` 설정 후 테스트 실행. 다른 OS에서는 실제 설치 경로를 지정합니다.
 - `TEST_SCREENSHOT_PATH`를 지정하면 테스트 화면 스크린샷을 저장할 수 있습니다. 운영 멤버가 아닌 가짜 데이터 화면입니다.
-- 테스트 범위: 직접 선택 10명, 모집 10/15/20명, 후보 3개, 재편성·적용·복사·저장, 모집 밖 멤버 교체, 모집 종료, 미분류 지속 안내, 모바일 390px 화면, JS 오류.
+- 테스트 범위: 직접 선택 10명, 모집 10/15/20명, 후보 3개, 재편성·적용·복사·저장, 모집 밖 멤버 교체, 모집 종료, 미분류 지속 안내, 모바일 390px 화면(하단 편성 바가 첫 화면에 보이는지, 맵 뽑기 버튼이 첫 화면에 보이는지 포함), JS 오류.
 - 맵 기능 수정 시 이 테스트만으로 충분하다고 간주하지 말고 맵 추첨·제외·초기화를 추가 확인합니다. 웹만 바꿨다면 GCP 봇 재시작은 필요하지 않습니다.
 
 작업 인계에는 **변경 파일 / 이유 / 실행한 테스트와 미검증 항목 / 커밋·푸시 여부 / 실제 배포 여부**를 구분해 남기세요.

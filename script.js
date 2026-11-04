@@ -192,7 +192,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && mapRevealEl.classList.contains("open")) closeMapReveal();
 });
 
-const DRAW_HINT_HTML = `<div class="draw-hint">아래 <b>맵 뽑기</b>를 눌러<br>맵을 뽑아보세요</div>`;
+// PC(버튼이 오른쪽)·모바일(버튼이 아래) 모두 맞도록 위치 표현 없이 안내
+const DRAW_HINT_HTML = `<div class="draw-hint"><b>맵 뽑기</b>를 눌러<br>맵을 뽑아보세요</div>`;
 
 function resetDraw() {
   if (isDrawing) return;
@@ -430,6 +431,8 @@ let activeSearch = "";
 const memberGridEl   = document.getElementById("memberGrid");
 const memberSearchEl = document.getElementById("memberSearch");
 const selectedCountEl = document.getElementById("selectedCount");
+// 필터 영역 배지 + 모바일 하단 편성 바 배지를 같은 내용으로 유지
+const selectedCountEls = [selectedCountEl, document.getElementById("dockSelectedCount")].filter(Boolean);
 const balanceTeamBtn  = document.getElementById("balanceTeamBtn");
 const internalBalanceTeamBtn = document.getElementById("internalBalanceTeamBtn");
 const teamBuilderNoticeEl = document.getElementById("teamBuilderNotice");
@@ -475,6 +478,13 @@ function getFilteredMembers() {
   });
 }
 
+// Firebase에서 온 문자열을 innerHTML에 넣기 전에 HTML로 해석되지 않게 변환
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
+  ));
+}
+
 function renderMemberGrid() {
   const filtered = getFilteredMembers();
 
@@ -489,7 +499,8 @@ function renderMemberGrid() {
       `<span class="pos-chip ${getPosClass(p)}">${p}</span>`
     ).join("");
 
-    const namePrefix = m.studentId ? `${m.studentId} ` : "";
+    // 학번·이름을 따로 감싸 모바일에서 학번을 둘째 줄로 내리고, 이름이 글자 중간에서 끊기지 않게 함
+    const studentIdHtml = m.studentId ? `<span class="member-sid">${escapeHtml(m.studentId)}</span> ` : "";
     const isRecruitmentParticipant = activeRecruitmentParticipantIds?.has(m.discordId);
     const recruitmentState = activeRecruitment && (isSelected || isRecruitmentParticipant)
       ? `<span class="recruitment-selection-state ${isSelected ? "main" : "reserve"}">${isSelected ? "선택됨" : "대기"}</span>`
@@ -499,8 +510,8 @@ function renderMemberGrid() {
       <div class="member-card${isSelected ? " selected" : ""}" data-index="${m.index}">
         <div class="member-card-top">
           <div>
-            <div class="member-name">${namePrefix}${m.name}</div>
-            ${m.riotId ? `<div class="member-riot">${m.riotId}</div>` : ""}
+            <div class="member-name">${studentIdHtml}<span class="member-name-text">${escapeHtml(m.name)}</span></div>
+            ${m.riotId ? `<div class="member-riot">${escapeHtml(m.riotId)}</div>` : ""}
           </div>
           <div class="check-indicator"></div>
         </div>
@@ -550,8 +561,7 @@ function updateSelectedCount() {
 
   if (activeRecruitment) {
     const ready = count === limit;
-    selectedCountEl.textContent = `${count} / ${limit}명 선택됨`;
-    selectedCountEl.classList.toggle("at-limit", ready);
+    setSelectedCountBadge(`${count} / ${limit}명 선택됨`, "at-limit", ready);
     balanceTeamBtn.disabled = !ready;
     internalBalanceTeamBtn.disabled = !ready;
     randomTeamBtn.disabled = !ready;
@@ -565,8 +575,7 @@ function updateSelectedCount() {
     return;
   }
 
-  selectedCountEl.textContent = `${count} / ${DEFAULT_MAX_SELECT}명 선택됨`;
-  selectedCountEl.classList.toggle("at-limit", count >= DEFAULT_MAX_SELECT);
+  setSelectedCountBadge(`${count} / ${DEFAULT_MAX_SELECT}명 선택됨`, "at-limit", count >= DEFAULT_MAX_SELECT);
   const canBuild = count >= 2;
   balanceTeamBtn.disabled = !canBuild;
   internalBalanceTeamBtn.disabled = count !== DEFAULT_MAX_SELECT;
@@ -578,16 +587,22 @@ function currentSelectionLimit() {
   return activeRecruitment ? selectedTeamCount * 5 : DEFAULT_MAX_SELECT;
 }
 
+function setSelectedCountBadge(text, className, enabled) {
+  selectedCountEls.forEach(el => {
+    el.textContent = text;
+    if (className) el.classList.toggle(className, enabled);
+  });
+}
+
 // 선택 가능 인원을 초과하면 잠깐 경고 표시
 function flashSelectLimit() {
   const limit = currentSelectionLimit();
-  selectedCountEl.textContent = activeRecruitment
+  setSelectedCountBadge(activeRecruitment
     ? `최대 ${limit}명입니다. 먼저 교체할 멤버를 해제해주세요!`
-    : `최대 ${limit}명까지만!`;
-  selectedCountEl.classList.add("limit-warn");
+    : `최대 ${limit}명까지만!`, "limit-warn", true);
   clearTimeout(flashSelectLimit._t);
   flashSelectLimit._t = setTimeout(() => {
-    selectedCountEl.classList.remove("limit-warn");
+    selectedCountEls.forEach(el => el.classList.remove("limit-warn"));
     updateSelectedCount();
   }, 1200);
 }
