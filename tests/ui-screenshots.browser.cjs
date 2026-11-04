@@ -95,6 +95,11 @@ async function run() {
       await page.locator("#teamResult").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));
       await page.waitForTimeout(900);
       await shot(page, `${prefix}-team-result.png`);
+      await page.click("#manualTeamBtn");
+      const manualRows = page.locator(".manual-row");
+      for (let i = 0; i < 7; i++) await manualRows.nth(i).locator(`[data-team="${i % 2 ? "B" : "A"}"]`).click();
+      await page.locator("#manualSection").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));
+      await shot(page, `${prefix}-manual.png`);
 
       await page.selectOption("#recruitmentSelect", "event_screens");
       await page.click("#selectRecruitmentMembersBtn");

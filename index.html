@@ -27,7 +27,7 @@
         </section>
 
         <nav class="tab-nav">
-            <button class="tab-btn active" data-tab="map">🎡 맵 고르기</button>
+            <button class="tab-btn active" data-tab="map">🃏 맵 고르기</button>
             <button class="tab-btn" data-tab="team">⚔️ 팀짜기</button>
         </nav>
 
@@ -55,7 +55,7 @@
 
                     <div class="mode-box">
                         <div class="mode-top">
-                            <span class="label">룰렛 모드</span>
+                            <span class="label">뽑기 모드</span>
                         </div>
 
                         <label class="toggle-row" for="excludeMode">
@@ -72,7 +72,7 @@
 
                         <div class="mode-status">
                             <span id="modeStatusText">현재: 기본 모드</span>
-                            <span id="remainingText">남은 맵: 12개</span>
+                            <span id="remainingText"></span>
                         </div>
                     </div>
 
@@ -103,10 +103,8 @@
 
                     <div class="map-list-box">
                         <span class="map-list-title">포함 맵</span>
-                        <p class="map-list-names">
-                            Ascent, Bind, Breeze, Haven, Icebox, Lotus,
-                            Pearl, Fracture, Split, Sunset, Abyss, Corrode
-                        </p>
+                        <p id="mapListNames" class="map-list-names"></p>
+                        <p id="mapListExcluded" class="map-list-excluded hidden"></p>
                     </div>
                 </aside>
             </section>
@@ -137,7 +135,7 @@
                 <!-- 컨트롤 영역 -->
                 <div class="team-controls card">
                     <div class="controls-top">
-                        <input type="text" id="memberSearch" class="search-input" placeholder="이름으로 검색...">
+                        <input type="text" id="memberSearch" class="search-input" placeholder="이름·학번·Riot ID 검색" aria-label="멤버 검색">
                         <div class="tier-filters" aria-label="인게임 티어 필터">
                             <span class="filter-label">인게임</span>
                             <button class="filter-btn game-tier-filter active" data-tier="all">전체</button>
@@ -186,7 +184,7 @@
                     <span id="dockSelectedCount" class="selected-badge dock-selected-count" aria-hidden="true">0명 선택됨</span>
                     <div class="team-action-bar">
                         <button id="balanceTeamBtn" class="primary-btn" disabled>⚖️ 인게임 티어 밸런스</button>
-                        <button id="internalBalanceTeamBtn" class="primary-btn" title="필요 인원을 모두 선택하면 사용 가능" disabled>🏆 발쫀잼 티어 밸런스</button>
+                        <button id="internalBalanceTeamBtn" class="primary-btn" disabled>🏆 발쫀잼 티어 밸런스</button>
                         <button id="randomTeamBtn" class="secondary-btn" disabled>🎲 랜덤 팀짜기</button>
                         <button id="manualTeamBtn" class="secondary-btn" disabled>✋ 직접 팀짜기</button>
                     </div>
@@ -214,11 +212,11 @@
                 <div id="manualSection" class="manual-section hidden">
                     <div class="manual-teams-preview">
                         <div class="manual-preview-box card team-a-border">
-                            <span class="manual-preview-label team-a-color">팀 A <span id="manualACount">0명</span></span>
+                            <span class="manual-preview-label team-a-color">팀 A <span id="manualACount" class="manual-preview-count">0명</span></span>
                             <div id="manualAChips" class="manual-chips"><span class="manual-chip-empty">없음</span></div>
                         </div>
                         <div class="manual-preview-box card team-b-border">
-                            <span class="manual-preview-label team-b-color">팀 B <span id="manualBCount">0명</span></span>
+                            <span class="manual-preview-label team-b-color">팀 B <span id="manualBCount" class="manual-preview-count">0명</span></span>
                             <div id="manualBChips" class="manual-chips"><span class="manual-chip-empty">없음</span></div>
                         </div>
                     </div>
@@ -260,7 +258,7 @@
 
     <!-- 맵 제외 설정 -->
     <div id="excludeModal" class="modal-overlay" aria-hidden="true">
-        <div class="modal-box modal-box-narrow" role="dialog" aria-modal="true" aria-label="맵 제외 설정">
+        <div class="modal-box modal-box-narrow" role="dialog" aria-modal="true" aria-label="맵 제외 설정" tabindex="-1">
             <div class="modal-head">
                 <span class="modal-title">🗺️ 맵 제외 설정</span>
                 <button id="excludeModalClose" class="modal-close" aria-label="닫기">✕</button>
@@ -276,7 +274,7 @@
 
     <!-- 맵 결과 리빌 -->
     <div id="mapReveal" class="map-reveal" aria-hidden="true">
-        <div class="map-reveal-card" role="dialog" aria-modal="true" aria-label="선택된 맵">
+        <div class="map-reveal-card" role="dialog" aria-modal="true" aria-label="선택된 맵" tabindex="-1">
             <span class="map-reveal-label">선택된 맵</span>
             <div class="map-reveal-img-wrap">
                 <img id="mapRevealImg" class="map-reveal-img" src="" alt="">
@@ -288,7 +286,7 @@
 
     <!-- 밸런스 후보 모달 -->
     <div id="balanceModal" class="modal-overlay" aria-hidden="true">
-        <div class="modal-box" role="dialog" aria-modal="true" aria-label="밸런스 후보">
+        <div class="modal-box" role="dialog" aria-modal="true" aria-label="밸런스 후보" tabindex="-1">
             <div class="modal-head">
                 <span id="balanceModalTitle" class="modal-title">⚖️ 밸런스 후보 3가지</span>
                 <button id="balanceModalClose" class="modal-close" aria-label="닫기">✕</button>

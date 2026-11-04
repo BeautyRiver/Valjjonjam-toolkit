@@ -1,7 +1,9 @@
-다시 켜는 명령어
+다시 켜는 명령어 (실제 Firestore를 읽으므로 실제 멤버 정보가 보입니다)
 
   프로젝트 폴더에서 터미널 열고:
-  python -m http.server 8000
+  python -m http.server 8000 --bind 127.0.0.1
   또는 어디서든:
-  python -m http.server 8000 --directory "C:/minkang_github/PRJOECT VAL/valjjonjam-map-wheel"
-  → 브라우저에서 http://localhost:8000
+  python -m http.server 8000 --bind 127.0.0.1 --directory "C:/minkang_github/PRJOECT VAL/Valjjonjam-toolkit"
+  → 브라우저에서 http://127.0.0.1:8000
+
+공개 주소: https://beautyriver.github.io/Valjjonjam-toolkit/ (main에 푸시하면 바로 반영)

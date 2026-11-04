@@ -62,6 +62,30 @@ function updateModeUI() {
 
   modeStatusText.textContent = isExcludeMode ? "현재: 제외 모드" : "현재: 기본 모드";
   remainingText.textContent = `남은 맵: ${getAvailableMaps().length}개`;
+  renderMapList();
+}
+
+// "포함 맵" 목록은 maps 배열에서 그려 맵이 추가돼도 화면 글자가 따로 놀지 않게 함
+const mapListNamesEl = document.getElementById("mapListNames");
+const mapListExcludedEl = document.getElementById("mapListExcluded");
+
+function renderMapList() {
+  const included = maps.filter(map => !excludedMaps.has(map));
+  const excluded = maps.filter(map => excludedMaps.has(map));
+  mapListNamesEl.textContent = included.length ? included.join(", ") : "없음";
+  mapListExcludedEl.textContent = excluded.length ? `제외: ${excluded.join(", ")}` : "";
+  mapListExcludedEl.classList.toggle("hidden", !excluded.length);
+}
+
+// 뽑을 맵이 없을 때: 전부 수동 제외인지, 제외 모드로 다 나왔는지 구분해 해결 방법을 안내
+function showNoMapsLeft() {
+  if (maps.every(map => excludedMaps.has(map))) {
+    resultText.textContent = "뽑을 맵 없음";
+    drawStageEl.innerHTML = `<div class="draw-hint">모든 맵이 제외되어 있어요.<br><b>맵 제외 설정</b>에서 포함할 맵을 고르세요</div>`;
+  } else {
+    resultText.textContent = "모든 맵 완료!";
+    drawStageEl.innerHTML = `<div class="draw-hint">남은 맵을 모두 뽑았어요.<br><b>초기화</b>를 누르면 처음부터 다시 뽑아요</div>`;
+  }
 }
 
 function getAvailableMaps() {
@@ -85,7 +109,7 @@ function drawMap() {
 
   const availableMaps = getAvailableMaps();
   if (availableMaps.length === 0) {
-    resultText.textContent = "모든 맵 완료!";
+    showNoMapsLeft();
     return;
   }
 
@@ -144,7 +168,8 @@ function drawMap() {
       resetBtn.disabled = false;
       excludeModeCheckbox.disabled = false;
 
-      if (excludeModeCheckbox.checked && usedMaps.length === maps.length) {
+      // 수동 제외 맵이 있어도 "남은 맵이 없음"을 기준으로 마지막 맵을 판단
+      if (excludeModeCheckbox.checked && getAvailableMaps().length === 0) {
         resultText.textContent = `${pickedMap} (마지막 맵)`;
       }
 
@@ -153,6 +178,52 @@ function drawMap() {
     }, DEAL_MS + FLIP_MS);
   }, SHUFFLE_MS);
 }
+
+// ===== 모달 공통 (맵 결과·맵 제외·밸런스 후보) =====
+// 열면 포커스를 모달 안으로 옮기고 배경 스크롤을 막음. Tab은 모달 안에서만 돌고, 닫으면 연 버튼으로 포커스를 되돌림
+const MODAL_LAYER_SELECTOR = ".modal-overlay.open, .map-reveal.open";
+const modalFocusReturn = new Map();
+
+function focusableIn(container) {
+  return [...container.querySelectorAll("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])")]
+    .filter(el => el.offsetParent !== null);
+}
+
+function openModalLayer(overlayEl, fallbackReturnEl = null) {
+  if (!modalFocusReturn.has(overlayEl)) {
+    const active = document.activeElement;
+    modalFocusReturn.set(overlayEl, active && active !== document.body ? active : fallbackReturnEl);
+  }
+  document.documentElement.classList.add("modal-open");
+  const box = overlayEl.querySelector("[tabindex='-1']");
+  (box || focusableIn(overlayEl)[0])?.focus({ preventScroll: true });
+}
+
+function closeModalLayer(overlayEl) {
+  const othersOpen = [...document.querySelectorAll(MODAL_LAYER_SELECTOR)].some(el => el !== overlayEl);
+  if (!othersOpen) document.documentElement.classList.remove("modal-open");
+  const back = modalFocusReturn.get(overlayEl);
+  modalFocusReturn.delete(overlayEl);
+  if (back && document.contains(back) && !back.disabled) back.focus({ preventScroll: true });
+}
+
+document.addEventListener("keydown", event => {
+  if (event.key !== "Tab") return;
+  const layer = [...document.querySelectorAll(MODAL_LAYER_SELECTOR)].pop();
+  if (!layer) return;
+  const items = focusableIn(layer);
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  const outside = !layer.contains(document.activeElement);
+  if (event.shiftKey && (outside || document.activeElement === first)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (outside || document.activeElement === last)) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 // ===== 맵 결과 리빌 =====
 
@@ -177,11 +248,14 @@ function showMapReveal(mapName) {
   void mapRevealEl.offsetWidth;
   mapRevealEl.classList.add("open");
   mapRevealEl.setAttribute("aria-hidden", "false");
+  openModalLayer(mapRevealEl, drawBtn);
 }
 
 function closeMapReveal() {
+  if (!mapRevealEl.classList.contains("open")) return;
   mapRevealEl.classList.remove("open");
   mapRevealEl.setAttribute("aria-hidden", "true");
+  closeModalLayer(mapRevealEl);
 }
 
 mapRevealCloseEl.addEventListener("click", closeMapReveal);
@@ -225,7 +299,7 @@ function renderExcludeGrid() {
   excludeGridEl.innerHTML = maps.map(m => {
     const ex = excludedMaps.has(m);
     return `
-      <button class="exclude-map${ex ? " excluded" : ""}" data-map="${m}">
+      <button class="exclude-map${ex ? " excluded" : ""}" data-map="${m}" aria-pressed="${ex}">
         <span class="exclude-map-thumb">
           <img src="valorant_map_png/${mapSlug(m)}.png" alt="">
         </span>
@@ -241,6 +315,7 @@ function renderExcludeGrid() {
       if (excludedMaps.has(m)) excludedMaps.delete(m);
       else excludedMaps.add(m);
       renderExcludeGrid();
+      excludeGridEl.querySelector(`.exclude-map[data-map="${m}"]`)?.focus();   // 다시 그려도 키보드 위치 유지
     });
   });
 }
@@ -249,12 +324,15 @@ function openExcludeModal() {
   renderExcludeGrid();
   excludeModalEl.classList.add("open");
   excludeModalEl.setAttribute("aria-hidden", "false");
+  openModalLayer(excludeModalEl, excludeMapsBtn);
 }
 
 function closeExcludeModal() {
+  if (!excludeModalEl.classList.contains("open")) return;
   excludeModalEl.classList.remove("open");
   excludeModalEl.setAttribute("aria-hidden", "true");
-  updateModeUI();   // 남은 맵 수 갱신
+  closeModalLayer(excludeModalEl);
+  updateModeUI();   // 남은 맵 수·포함 맵 목록 갱신
 }
 
 excludeMapsBtn.addEventListener("click", openExcludeModal);
@@ -512,7 +590,7 @@ function renderMemberGrid() {
       : "";
 
     return `
-      <div class="member-card${isSelected ? " selected" : ""}" data-index="${m.index}">
+      <div class="member-card${isSelected ? " selected" : ""}" data-index="${m.index}" role="checkbox" tabindex="0" aria-checked="${isSelected}">
         <div class="member-card-top">
           <div>
             <div class="member-name">${studentIdHtml}<span class="member-name-text">${escapeHtml(m.name)}</span></div>
@@ -545,12 +623,28 @@ function renderMemberGrid() {
         selectedIndices.add(idx);
         card.classList.add("selected");
       }
+      card.setAttribute("aria-checked", String(selectedIndices.has(idx)));
       if (activeRecruitment) renderMemberGrid();
-      recruitmentResultEl.classList.add("hidden");
-      lastRecruitmentResult = null;
-      updateSelectedCount();
+      handleSelectionChange();
+    });
+    // 키보드로도 선택: 카드에 포커스한 뒤 Space·Enter
+    card.addEventListener("keydown", event => {
+      if (event.key !== " " && event.key !== "Enter") return;
+      event.preventDefault();
+      const idx = card.dataset.index;
+      card.click();
+      memberGridEl.querySelector(`.member-card[data-index="${idx}"]`)?.focus();
     });
   });
+}
+
+// 선택이 바뀌면 이전 결과는 지금 선택과 맞지 않으므로 숨김 (직접 선택 결과는 저장 보드에서 다시 불러올 수 있음)
+function handleSelectionChange() {
+  recruitmentResultEl.classList.add("hidden");
+  lastRecruitmentResult = null;
+  teamResultEl.classList.add("hidden");
+  updateSelectedCount();
+  if (!manualSectionEl.classList.contains("hidden")) renderManualSection();
 }
 
 function setTeamBuilderNotice(message = "") {
@@ -559,8 +653,10 @@ function setTeamBuilderNotice(message = "") {
   if (message) teamBuilderNoticeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-function updateSelectedCount() {
-  setTeamBuilderNotice();
+// 선택이 바뀌면 이전 안내는 지움. 한도 경고가 끝난 뒤 배지만 되돌릴 때는 keepNotice로 안내를 유지
+function updateSelectedCount({ keepNotice = false } = {}) {
+  if (!keepNotice) setTeamBuilderNotice();
+  syncManualAssign();   // 선택에서 빠진 사람의 직접 팀짜기 배정은 지움 (다시 고르면 미배정부터)
   const count = selectedIndices.size;
   const limit = currentSelectionLimit();
 
@@ -581,9 +677,10 @@ function updateSelectedCount() {
   }
 
   setSelectedCountBadge(`${count} / ${DEFAULT_MAX_SELECT}명 선택됨`, "at-limit", count >= DEFAULT_MAX_SELECT);
+  // 직접 선택은 네 가지 편성 모두 2명부터 사용 (발쫀잼 티어 밸런스도 인게임 밸런스와 같은 조건)
   const canBuild = count >= 2;
   balanceTeamBtn.disabled = !canBuild;
-  internalBalanceTeamBtn.disabled = count !== DEFAULT_MAX_SELECT;
+  internalBalanceTeamBtn.disabled = !canBuild;
   randomTeamBtn.disabled = !canBuild;
   manualTeamBtn.disabled = !canBuild;
 }
@@ -608,7 +705,7 @@ function flashSelectLimit() {
   clearTimeout(flashSelectLimit._t);
   flashSelectLimit._t = setTimeout(() => {
     selectedCountEls.forEach(el => el.classList.remove("limit-warn"));
-    updateSelectedCount();
+    updateSelectedCount({ keepNotice: true });
   }, 1200);
 }
 
@@ -662,23 +759,39 @@ function memberTierLabelHtml(m, scoreMode = activeScoreMode) {
     : tierTextBadgeHtml(m.tier);
 }
 
-// 팀 멤버 행들의 HTML (재사용: 결과 화면 + 모달 + 대기 명단)
-function teamRowsHtml(team, scoreMode = activeScoreMode) {
-  return team.map(m => {
-    const sid = m.studentId ? `<span class="team-member-sid">${escapeHtml(m.studentId)}</span>` : "";
-    const riot = m.riotId ? `<span class="team-member-riot">${escapeHtml(m.riotId)}</span>` : "";
-    const sub = sid || riot ? `<span class="team-member-sub">${sid}${riot}</span>` : "";
-    return `
-    <div class="team-member-row">
-      ${memberPortraitHtml(m, scoreMode)}
+// 이름 아래 학번·Riot ID (결과 행·직접 팀짜기 행 공통)
+function memberInfoHtml(m) {
+  const sid = m.studentId ? `<span class="team-member-sid">${escapeHtml(m.studentId)}</span>` : "";
+  const riot = m.riotId ? `<span class="team-member-riot">${escapeHtml(m.riotId)}</span>` : "";
+  const sub = sid || riot ? `<span class="team-member-sub">${sid}${riot}</span>` : "";
+  return `
       <div class="team-member-info">
         <span class="team-member-name">${escapeHtml(m.name)}</span>
         ${sub}
-      </div>
+      </div>`;
+}
+
+// 팀 멤버 행들의 HTML (재사용: 결과 화면 + 모달 + 대기 명단)
+function teamRowsHtml(team, scoreMode = activeScoreMode) {
+  return team.map(m => `
+    <div class="team-member-row">
+      ${memberPortraitHtml(m, scoreMode)}
+      ${memberInfoHtml(m)}
       <span class="team-member-tier">${memberTierLabelHtml(m, scoreMode)}</span>
     </div>
-  `;
-  }).join("");
+  `).join("");
+}
+
+// 편성 방식 이름: 결과 화면·복사 문구·저장 보드에서 같은 말을 씀
+const TEAM_METHOD_LABELS = { balance: "밸런스 편성", random: "랜덤 편성", manual: "직접 편성" };
+
+function teamMethodLabel(method) {
+  return TEAM_METHOD_LABELS[method] || TEAM_METHOD_LABELS.balance;
+}
+
+// 결과의 기준 문구: "밸런스 편성 · 인게임 티어 기준"
+function teamBasisText(scoreMode, method) {
+  return `${teamMethodLabel(method)} · ${scoreModeLabel(scoreMode)} 기준`;
 }
 
 // 팀 카드 머리: "팀" + 큰 팀 글자, 오른쪽에 인원(과 점수)
@@ -695,10 +808,11 @@ function teamHeaderHtml(letter, team, scoreMode, showScore) {
 }
 
 // 두 팀 점수를 마주 보게 놓고, 막대의 갈림점으로 얼마나 고른지 보여줌
-function scoreboardHtml(sA, sB, scoreMode, withBasis = false) {
+// basisText를 주면 점수차 옆에 기준 문구를 함께 표시
+function scoreboardHtml(sA, sB, basisText = "") {
   const total = sA + sB;
   const share = total > 0 ? (sA / total) * 100 : 50;
-  const basis = withBasis ? `<span class="sb-basis">${scoreModeLabel(scoreMode)} 기준</span>` : "";
+  const basis = basisText ? `<span class="sb-basis">${escapeHtml(basisText)}</span>` : "";
   return `
     <div class="scoreboard" style="--a-share:${share.toFixed(2)}%">
       <span class="sb-side sb-a"><span class="sb-letter">A</span><span class="sb-score">${sA}</span></span>
@@ -727,8 +841,9 @@ function teamGridHtml(teamA, teamB, scoreMode = activeScoreMode) {
   `;
 }
 
-function teamMetaText(team, scoreMode) {
-  return `${team.length}명 · ${scoreModeLabel(scoreMode)} ${teamScore(team, scoreMode)}점`;
+// 복사 문구의 팀 줄: 2팀·다중팀 모두 "팀 A (5명 · 112점)"
+function teamCopyHeading(label, team, scoreMode) {
+  return `팀 ${label} (${team.length}명 · ${teamScore(team, scoreMode)}점)`;
 }
 
 function renderTeamList(container, team, scoreMode = activeScoreMode) {
@@ -736,20 +851,21 @@ function renderTeamList(container, team, scoreMode = activeScoreMode) {
 }
 
 // 결과 복사용으로 마지막 팀 구성 보관
-let lastTeams = { teamA: [], teamB: [], scoreMode: SCORE_MODE_GAME };
+let lastTeams = { teamA: [], teamB: [], scoreMode: SCORE_MODE_GAME, method: "balance" };
 
 // 팀 내부를 티어 내림차순으로 정렬
 function sortByTier(team, scoreMode = activeScoreMode) {
   return [...team].sort((a, b) => memberScore(b, scoreMode) - memberScore(a, scoreMode));
 }
 
-function displayTeams(teamA, teamB, scoreMode = activeScoreMode) {
+// method: "balance" | "random" | "manual"
+function displayTeams(teamA, teamB, scoreMode = activeScoreMode, method = "balance") {
   activeScoreMode = scoreMode;
   teamA = sortByTier(teamA, scoreMode);
   teamB = sortByTier(teamB, scoreMode);
-  lastTeams = { teamA, teamB, scoreMode };
+  lastTeams = { teamA, teamB, scoreMode, method };
   const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
-  teamScoreboardEl.innerHTML = scoreboardHtml(sA, sB, scoreMode, true);
+  teamScoreboardEl.innerHTML = scoreboardHtml(sA, sB, teamBasisText(scoreMode, method));
   teamAMetaEl.textContent = `${teamA.length}명`;
   teamBMetaEl.textContent = `${teamB.length}명`;
   renderTeamList(teamAListEl, teamA, scoreMode);
@@ -857,11 +973,17 @@ copyInternalTiersBtn.addEventListener("click", () => {
 document.getElementById("deselectAllBtn").addEventListener("click", () => {
   getFilteredMembers().forEach(m => selectedIndices.delete(m.index));
   renderMemberGrid();
-  updateSelectedCount();
+  handleSelectionChange();
 });
 
 // 디버그: 전체 멤버 중 아무나 10명(부족하면 있는 만큼) 즉시 선택
-document.getElementById("debugPick10Btn").addEventListener("click", () => {
+// 공개 사이트에서는 숨기고, 로컬 실행이거나 주소에 ?debug가 있을 때만 보임
+const debugPick10Btn = document.getElementById("debugPick10Btn");
+debugPick10Btn.hidden = !(
+  ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
+  || new URLSearchParams(location.search).has("debug")
+);
+debugPick10Btn.addEventListener("click", () => {
   selectedIndices.clear();
   const pool = shuffle(members
     .map((member, index) => ({ member, index }))
@@ -870,7 +992,7 @@ document.getElementById("debugPick10Btn").addEventListener("click", () => {
     .slice(0, currentSelectionLimit());
   pool.forEach(i => selectedIndices.add(i));
   renderMemberGrid();
-  updateSelectedCount();
+  handleSelectionChange();
 });
 
 // ===== 밸런스 팀짜기: 점수차 최소인 구성 1개 (누를 때마다 새로) =====
@@ -966,7 +1088,7 @@ function renderModalTrio() {
         <div class="opt-head">
           <span class="opt-title">옵션 ${idx + 1}</span>
         </div>
-        ${scoreboardHtml(teamScore(teamA), teamScore(teamB), activeScoreMode)}
+        ${scoreboardHtml(teamScore(teamA), teamScore(teamB))}
         ${teamGridHtml(teamA, teamB)}
         <button class="primary-btn opt-save" data-opt="${idx}">이 구성 저장</button>
       </div>
@@ -1060,12 +1182,15 @@ function openBalanceModal() {
   renderModalTrio();
   balanceModalEl.classList.add("open");
   balanceModalEl.setAttribute("aria-hidden", "false");
+  openModalLayer(balanceModalEl);
 }
 
 function closeBalanceModal() {
+  recruitmentBalanceContext = null;
+  if (!balanceModalEl.classList.contains("open")) return;
   balanceModalEl.classList.remove("open");
   balanceModalEl.setAttribute("aria-hidden", "true");
-  recruitmentBalanceContext = null;
+  closeModalLayer(balanceModalEl);
 }
 
 balanceTeamBtn.addEventListener("click", () => {
@@ -1138,55 +1263,65 @@ randomTeamBtn.addEventListener("click", () => {
     return;
   }
   const { teamA, teamB } = buildTeams("random");
-  displayTeams(teamA, teamB, SCORE_MODE_GAME);
+  displayTeams(teamA, teamB, SCORE_MODE_GAME, "random");
 });
 
 // 직접 팀짜기
-const manualAssign = {}; // index -> 'A' | 'B' | null
+// 배정은 Discord ID로 기억: 멤버를 새로 불러와 정렬(인덱스)이 바뀌어도 다른 사람에게 옮겨 가지 않음
+const manualAssign = {}; // discordId -> 'A' | 'B' | null
+
+function manualAssignOf(index) {
+  return manualAssign[members[index]?.discordId] ?? null;
+}
+
+// 선택된 멤버만 남기고 기존 배정은 유지
+function syncManualAssign() {
+  const selectedIds = new Set([...selectedIndices].map(i => members[i]?.discordId).filter(Boolean));
+  selectedIds.forEach(id => {
+    if (!(id in manualAssign)) manualAssign[id] = null;
+  });
+  Object.keys(manualAssign).forEach(id => {
+    if (!selectedIds.has(id)) delete manualAssign[id];
+  });
+}
 
 function openManualTeam() {
   setTeamBuilderNotice();
-  // 선택된 멤버만 초기화 (기존 배정 유지)
-  [...selectedIndices].forEach(i => {
-    if (!(i in manualAssign)) manualAssign[i] = null;
-  });
-  Object.keys(manualAssign).forEach(k => {
-    if (!selectedIndices.has(parseInt(k))) delete manualAssign[k];
-  });
-
+  syncManualAssign();
   teamResultEl.classList.add("hidden");
   manualSectionEl.classList.remove("hidden");
   renderManualSection();
   manualSectionEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+function manualChipsHtml(indices) {
+  return indices.length
+    ? indices.map(i => `<span class="manual-chip">${escapeHtml(members[i].name)}</span>`).join("")
+    : `<span class="manual-chip-empty">없음</span>`;
+}
+
 function renderManualSection() {
-  const aIdx = [...selectedIndices].filter(i => manualAssign[i] === "A");
-  const bIdx = [...selectedIndices].filter(i => manualAssign[i] === "B");
+  const selected = [...selectedIndices];
+  const aIdx = selected.filter(i => manualAssignOf(i) === "A");
+  const bIdx = selected.filter(i => manualAssignOf(i) === "B");
+  const unassigned = selected.length - aIdx.length - bIdx.length;
 
   manualACountEl.textContent = `${aIdx.length}명`;
   manualBCountEl.textContent = `${bIdx.length}명`;
+  manualAChipsEl.innerHTML = manualChipsHtml(aIdx);
+  manualBChipsEl.innerHTML = manualChipsHtml(bIdx);
 
-  manualAChipsEl.innerHTML = aIdx.length
-    ? aIdx.map(i => `<span class="manual-chip">${escapeHtml(members[i].name)}</span>`).join("")
-    : `<span class="manual-chip-empty">없음</span>`;
-
-  manualBChipsEl.innerHTML = bIdx.length
-    ? bIdx.map(i => `<span class="manual-chip">${escapeHtml(members[i].name)}</span>`).join("")
-    : `<span class="manual-chip-empty">없음</span>`;
-
-  manualMemberListEl.innerHTML = [...selectedIndices].map(i => {
+  manualMemberListEl.innerHTML = selected.map(i => {
     const m = members[i];
-    const assigned = manualAssign[i];
+    const assigned = manualAssignOf(i);
+    const rowClass = assigned === "A" ? " assigned-a" : assigned === "B" ? " assigned-b" : "";
     return `
-      <div class="manual-row" data-index="${i}">
-        <div class="manual-row-info">
-          <span class="member-name">${m.studentId ? `${escapeHtml(m.studentId)} ` : ""}${escapeHtml(m.name)}</span>
-          ${tierBadgeHtml(m.tier)}
-        </div>
-        <div class="manual-assign-btns">
-          <button class="assign-btn${assigned === "A" ? " assign-active-a" : ""}" data-team="A">A팀</button>
-          <button class="assign-btn${assigned === "B" ? " assign-active-b" : ""}" data-team="B">B팀</button>
+      <div class="manual-row${rowClass}" data-index="${i}">
+        ${memberPortraitHtml(m, SCORE_MODE_GAME)}
+        ${memberInfoHtml(m)}
+        <div class="manual-assign-btns" role="group" aria-label="${escapeHtml(m.name)} 팀 배정">
+          <button class="assign-btn${assigned === "A" ? " assign-active-a" : ""}" data-team="A" aria-pressed="${assigned === "A"}">팀 A</button>
+          <button class="assign-btn${assigned === "B" ? " assign-active-b" : ""}" data-team="B" aria-pressed="${assigned === "B"}">팀 B</button>
         </div>
       </div>
     `;
@@ -1194,23 +1329,32 @@ function renderManualSection() {
 
   manualMemberListEl.querySelectorAll(".assign-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      const idx  = parseInt(btn.closest(".manual-row").dataset.index);
+      const idx = parseInt(btn.closest(".manual-row").dataset.index);
+      const id = members[idx]?.discordId;
+      if (!id) return;
       const team = btn.dataset.team;
-      manualAssign[idx] = manualAssign[idx] === team ? null : team;
+      manualAssign[id] = manualAssign[id] === team ? null : team;
       renderManualSection();
+      manualMemberListEl
+        .querySelector(`.manual-row[data-index="${idx}"] .assign-btn[data-team="${team}"]`)
+        ?.focus();
     });
   });
 
-  confirmManualBtn.disabled = aIdx.length === 0 || bIdx.length === 0;
+  // 배정하지 않은 사람이 남아 있으면 확정하지 않음 (말없이 빠지는 일 방지)
+  confirmManualBtn.disabled = unassigned > 0 || aIdx.length === 0 || bIdx.length === 0;
+  confirmManualBtn.textContent = unassigned > 0 ? `확정하기 · 미배정 ${unassigned}명` : "확정하기";
 }
 
 manualTeamBtn.addEventListener("click", openManualTeam);
 
 confirmManualBtn.addEventListener("click", () => {
-  const teamA = [...selectedIndices].filter(i => manualAssign[i] === "A").map(i => members[i]);
-  const teamB = [...selectedIndices].filter(i => manualAssign[i] === "B").map(i => members[i]);
+  const selected = [...selectedIndices];
+  const teamA = selected.filter(i => manualAssignOf(i) === "A").map(i => members[i]);
+  const teamB = selected.filter(i => manualAssignOf(i) === "B").map(i => members[i]);
+  if (teamA.length + teamB.length !== selected.length) return;
   manualSectionEl.classList.add("hidden");
-  displayTeams(teamA, teamB, SCORE_MODE_GAME);
+  displayTeams(teamA, teamB, SCORE_MODE_GAME, "manual");
 });
 
 // 결과 복사 (lastTeams 데이터 기반: 학번 이름 발로ID - 선택한 밸런스 티어)
@@ -1223,14 +1367,23 @@ function memberLine(m, scoreMode) {
   return `  ${sid}${m.name}${riot} - ${tierLabel}`;
 }
 
+// 직접 선택 결과 복사 문구 (모집 결과 복사와 같은 형식)
+function buildTeamResultText() {
+  const { teamA, teamB, scoreMode, method } = lastTeams;
+  const diff = Math.abs(teamScore(teamA, scoreMode) - teamScore(teamB, scoreMode));
+  return [
+    `[${teamBasisText(scoreMode, method)} · 점수차 ${diff}점]`,
+    "",
+    teamCopyHeading("A", teamA, scoreMode),
+    ...teamA.map(m => memberLine(m, scoreMode)),
+    "",
+    teamCopyHeading("B", teamB, scoreMode),
+    ...teamB.map(m => memberLine(m, scoreMode))
+  ].join("\n");
+}
+
 copyResultBtn.addEventListener("click", () => {
-  const aRows = lastTeams.teamA.map(m => memberLine(m, lastTeams.scoreMode));
-  const bRows = lastTeams.teamB.map(m => memberLine(m, lastTeams.scoreMode));
-
-  const { teamA, teamB, scoreMode } = lastTeams;
-  const text = `[${scoreModeLabel(scoreMode)} 기준]\n팀 A (${teamMetaText(teamA, scoreMode)})\n${aRows.join("\n")}\n\n팀 B (${teamMetaText(teamB, scoreMode)})\n${bRows.join("\n")}`;
-
-  copyTextToClipboard(text).then(() => {
+  copyTextToClipboard(buildTeamResultText()).then(() => {
     copyResultBtn.textContent = "✅ 복사됨!";
     setTimeout(() => { copyResultBtn.textContent = "📋 결과 복사하기"; }, 2000);
   }).catch(() => {
@@ -1242,7 +1395,7 @@ copyResultBtn.addEventListener("click", () => {
 // ===== 저장 보드 (최대 5개) =====
 
 const MAX_SAVED = 5;
-let savedResults = [];   // { teamA, teamB, sA, sB, diff, key, scoreMode }
+let savedResults = [];   // { teamA, teamB, sA, sB, diff, key, scoreMode, method }
 
 function flashSaveBtn(text) {
   const old = saveResultBtn.textContent;
@@ -1263,19 +1416,19 @@ function teamsKey(teamA, teamB) {
 }
 
 // 보드에 저장 (중복/가득참 검사). 반환: "ok" | "dup" | "full" | "empty"
-function saveTeams(teamA, teamB, scoreMode = activeScoreMode) {
+function saveTeams(teamA, teamB, scoreMode = activeScoreMode, method = "balance") {
   if (!teamA.length && !teamB.length) return "empty";
   const key = teamsKey(teamA, teamB);
   if (savedResults.some(r => r.key === key)) return "dup";
   if (savedResults.length >= MAX_SAVED) return "full";
   const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
-  savedResults.push({ teamA, teamB, sA, sB, diff: Math.abs(sA - sB), key, scoreMode });
+  savedResults.push({ teamA, teamB, sA, sB, diff: Math.abs(sA - sB), key, scoreMode, method });
   renderSavedBoard();
   return "ok";
 }
 
 saveResultBtn.addEventListener("click", () => {
-  const status = saveTeams(lastTeams.teamA, lastTeams.teamB, lastTeams.scoreMode);
+  const status = saveTeams(lastTeams.teamA, lastTeams.teamB, lastTeams.scoreMode, lastTeams.method);
   if (status === "dup")  flashSaveBtn("이미 저장된 구성!");
   else if (status === "full") flashSaveBtn(`최대 ${MAX_SAVED}개까지!`);
   else if (status === "ok")   flashSaveBtn("✅ 저장됨!");
@@ -1289,23 +1442,30 @@ function renderSavedBoard() {
   }
   savedBoardEl.classList.remove("hidden");
 
-  const namesOf = team => team
-    .map(m => escapeHtml(`${m.studentId ? m.studentId + " " : ""}${m.name}`))
-    .join(", ");
+  const namesOf = team => team.map(m => escapeHtml(m.name)).join(", ");
+  const teamLineHtml = (letter, team) => `
+        <div class="saved-team team-${letter.toLowerCase()}-card">
+          <span class="saved-team-label">팀 ${letter} <span class="saved-team-count">${team.length}명</span></span>
+          <span class="saved-team-names">${namesOf(team)}</span>
+        </div>`;
 
+  // 결과 화면과 같은 스코어보드·팀 색을 써서 저장한 구성을 한눈에 비교
   savedBoardEl.innerHTML = `
     <div class="saved-board-head">
-      <span class="saved-board-title">📋 저장된 구성</span>
+      <span class="saved-board-title">💾 저장된 구성</span>
       <span class="saved-board-count">${savedResults.length} / ${MAX_SAVED}</span>
     </div>
     ${savedResults.map((r, idx) => `
       <div class="saved-item card" data-idx="${idx}">
         <div class="saved-item-head">
-          <span class="saved-item-title">#${idx + 1} · ${scoreModeLabel(r.scoreMode)}</span>
-          <span class="opt-diff">점수차 ${r.diff}</span>
+          <span class="saved-item-title">#${idx + 1}</span>
+          <span class="saved-item-basis">${teamBasisText(r.scoreMode, r.method)}</span>
         </div>
-        <div class="opt-team"><span class="opt-tag team-a-color">A · ${r.teamA.length}명 · ${r.sA}점</span> ${namesOf(r.teamA)}</div>
-        <div class="opt-team"><span class="opt-tag team-b-color">B · ${r.teamB.length}명 · ${r.sB}점</span> ${namesOf(r.teamB)}</div>
+        ${scoreboardHtml(r.sA, r.sB)}
+        <div class="saved-teams">
+          ${teamLineHtml("A", r.teamA)}
+          ${teamLineHtml("B", r.teamB)}
+        </div>
         <div class="saved-item-actions">
           <button class="sm-btn secondary-btn saved-load" data-idx="${idx}">불러오기</button>
           <button class="sm-btn secondary-btn saved-del" data-idx="${idx}">삭제</button>
@@ -1317,7 +1477,7 @@ function renderSavedBoard() {
   savedBoardEl.querySelectorAll(".saved-load").forEach(btn => {
     btn.addEventListener("click", () => {
       const r = savedResults[parseInt(btn.dataset.idx)];
-      if (r) displayTeams(r.teamA, r.teamB, r.scoreMode);
+      if (r) displayTeams(r.teamA, r.teamB, r.scoreMode, r.method);
     });
   });
   savedBoardEl.querySelectorAll(".saved-del").forEach(btn => {
@@ -1595,6 +1755,29 @@ function renderRecruitmentOptions(previousId = "") {
   refreshRecruitmentPreview();
 }
 
+// 자동 선택 중에 모집을 새로고침하면: 참가자 표시(대기 배지·대기 명단)는 새 명단으로 바꾸되
+// 사람이 직접 고친 선택과 팀 수는 건드리지 않고, 명단이 바뀌었으면 다시 자동 선택하는 방법을 안내
+function syncActiveRecruitmentAfterReload() {
+  const updated = recruitments.find(item => item.id === activeRecruitment.id);
+  if (!updated) {
+    setRecruitmentStatus("자동 선택 중인 모집이 목록에서 사라졌어요. 현재 선택은 그대로 두었습니다.", "warning");
+    return;
+  }
+  const before = recruitmentParticipantIds(activeRecruitment);
+  const after = recruitmentParticipantIds(updated);
+  const changed = before.join(",") !== after.join(",");
+  activeRecruitment = updated;
+  activeRecruitmentParticipantIds = new Set(after);
+  renderMemberGrid();
+  updateSelectedCount({ keepNotice: true });
+  setRecruitmentStatus(
+    changed
+      ? `참가자 명단이 바뀌었어요 (${before.length}명 → ${after.length}명). 새 명단으로 다시 고르려면 '참가자들 자동 선택'을 누르세요. 지금 선택은 그대로입니다.`
+      : "모집 정보를 새로 불러왔어요. 참가자 변동이 없어 현재 선택을 유지합니다.",
+    changed ? "warning" : "success"
+  );
+}
+
 async function loadRecruitments() {
   if (!isConfigReady() || !initFirebase()) {
     setRecruitmentStatus("Firebase 연결 설정을 확인해주세요.", "error");
@@ -1632,6 +1815,7 @@ async function loadRecruitments() {
     if (!recruitments.length) {
       setRecruitmentStatus("아직 불러올 파티나 발쫀전 모집이 없어요.");
     }
+    if (activeRecruitment) syncActiveRecruitmentAfterReload();
   } catch (error) {
     console.error("[toolkit_recruitments] 불러오기 실패:", error);
     recruitments = [];
@@ -1743,6 +1927,7 @@ function openRecruitmentBalanceModal(recruitment, analysis, scoreMode, reroll) {
   renderRecruitmentBalanceCandidates();
   balanceModalEl.classList.add("open");
   balanceModalEl.setAttribute("aria-hidden", "false");
+  openModalLayer(balanceModalEl);
 }
 
 function renderRecruitmentBalanceCandidates() {
@@ -1787,9 +1972,8 @@ function renderRecruitmentBalanceCandidates() {
 
 function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, method) {
   const teams = candidate.teams.map(team => sortByTier(team, scoreMode));
-  recruitmentResultLabelEl.textContent = method === "random"
-    ? "🎲 모집 참가자 랜덤 편성"
-    : `${scoreMode === SCORE_MODE_INTERNAL ? "🏆" : "⚖️"} ${scoreModeLabel(scoreMode)} 자동 편성`;
+  const icon = method === "random" ? "🎲" : scoreMode === SCORE_MODE_INTERNAL ? "🏆" : "⚖️";
+  recruitmentResultLabelEl.textContent = `${icon} ${teamBasisText(scoreMode, method)}`;
   recruitmentResultTitleEl.textContent = `${recruitmentTypeLabel(recruitment)} · ${recruitment.name}`;
   recruitmentResultSummaryEl.textContent = `${teams.length}팀 · 최대 점수차 ${candidate.metric.spread}점`;
   recruitmentTeamGridEl.innerHTML = multiTeamGridHtml(teams, scoreMode);
@@ -1874,13 +2058,14 @@ function buildSelectedRecruitmentTeams(scoreMode, reroll = false, method = "bala
 function buildRecruitmentResultText() {
   if (!lastRecruitmentResult) return "";
   const { recruitment, analysis, teams, scoreMode, method } = lastRecruitmentResult;
+  const spread = multiTeamMetric(teams, scoreMode).spread;
   const lines = [
     `[${recruitmentTypeLabel(recruitment)} · ${recruitment.name}]`,
-    `[${method === "random" ? "랜덤" : scoreModeLabel(scoreMode)} 기준]`
+    `[${teamBasisText(scoreMode, method)} · 최대 점수차 ${spread}점]`
   ];
 
   teams.forEach((team, index) => {
-    lines.push("", `팀 ${multiTeamLabel(index)} (${teamScore(team, scoreMode)}점)`);
+    lines.push("", teamCopyHeading(multiTeamLabel(index), team, scoreMode));
     lines.push(...team.map(member => memberLine(member, scoreMode)));
   });
 
@@ -1954,16 +2139,35 @@ async function loadMembers() {
     });
     loaded.sort((a, b) => tierScore(b.tier) - tierScore(a.tier));
 
+    // 새로고침 전 선택(모집 모드의 교체 포함)을 Discord ID로 기억해 새 목록에서 다시 체크
+    const previousSelectedIds = [...selectedIndices].map(i => members[i]?.discordId).filter(Boolean);
     members = loaded;
     selectedIndices.clear();
 
     if (members.length === 0) {
       showMemberMessage("등록된 멤버가 없어요. 디스코드에서 <code>/기본설정</code>을 먼저 진행해주세요.");
-    } else if (activeRecruitment) {
+    } else if (activeRecruitment && !previousSelectedIds.length) {
       autoSelectActiveRecruitment();
     } else {
+      const indexById = new Map(members.map((member, index) => [member.discordId, index]));
+      previousSelectedIds.forEach(id => {
+        const index = indexById.get(id);
+        if (index !== undefined && selectedIndices.size < currentSelectionLimit()) selectedIndices.add(index);
+      });
       renderMemberGrid();
       updateSelectedCount();
+      if (!manualSectionEl.classList.contains("hidden")) renderManualSection();
+      const lost = previousSelectedIds.length - selectedIndices.size;
+      if (activeRecruitment) {
+        setRecruitmentStatus(
+          lost
+            ? `멤버 정보를 새로 불러왔어요. ${lost}명은 멤버 목록에서 찾지 못해 선택에서 빠졌어요.`
+            : "멤버 정보를 새로 불러왔어요. 교체한 멤버를 포함해 현재 선택을 그대로 유지합니다.",
+          lost ? "warning" : "success"
+        );
+      } else if (lost) {
+        setTeamBuilderNotice(`⚠️ 새로고침 후 ${lost}명을 멤버 목록에서 찾지 못해 선택에서 뺐어요.`);
+      }
     }
     copyInternalTiersBtn.disabled = !members.some(member => member.internalTier);
     if (!activeRecruitment && recruitmentSelectEl.value) refreshRecruitmentPreview();
