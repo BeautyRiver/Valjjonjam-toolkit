@@ -191,6 +191,7 @@ async function run() {
     const directCopy = await page.evaluate(() => buildTeamResultText());
     assert.ok(directCopy.startsWith("[직접 편성 · 인게임 티어 기준 · 점수차 "), directCopy);
     assert.ok(directCopy.includes("팀 A (5명 · ") && directCopy.includes("팀 B (5명 · "));
+    await page.evaluate(() => { savedResults.length = 0; renderSavedBoard(); });   // 앞서 저장한 구성과 우연히 겹치지 않게
     await page.click("#saveResultBtn");
     assert.ok((await page.locator("#savedBoard").textContent()).includes("직접 편성"));
 
@@ -252,6 +253,88 @@ async function run() {
     await page.click('[data-tab="team"]');
     await assertNoInjectedHtml("manual rows, saved board, copy text");
     console.log("PASS: notice after limit, manual unassigned guard, reload keeps selection, recruitment reload notice, map list, keyboard and modal focus");
+
+    // 팀 편집 (직접 선택 2팀): 한 명 고른 뒤 다른 팀 사람을 누르면 맞바꿈, 점수·문구 갱신, 되돌리기, 키보드, 저장
+    const isDealing = selector => page.locator(selector).evaluate(el => el.classList.contains("is-dealing"));
+    for (let i = 0; i < 10; i++) await page.locator(`.member-card[data-index="${i}"]`).click();
+    await page.click("#randomTeamBtn");
+    assert.equal(await isDealing("#teamResult"), true, "random result is dealt in");
+    const directTeams = () => page.evaluate(() => ({
+      a: lastTeams.teamA.map(m => m.discordId).sort(), b: lastTeams.teamB.map(m => m.discordId).sort(), edited: lastTeams.edited
+    }));
+    const originalTeams = await directTeams();
+    await page.click("#editTeamsBtn");
+    assert.equal(await page.locator("#teamEditHint").isVisible(), true);
+    assert.equal(await page.locator("#undoTeamSwapBtn").isDisabled(), true);
+    const aId = await page.locator("#teamAList .team-member-row").first().getAttribute("data-member-id");
+    const bId = await page.locator("#teamBList .team-member-row").first().getAttribute("data-member-id");
+    const rowOf = id => page.locator(`#teamResult [data-team-index] .team-member-row[data-member-id="${id}"]`);
+    await rowOf(aId).click();
+    assert.equal(await rowOf(aId).getAttribute("aria-pressed"), "true");
+    await rowOf(bId).click();
+    const swappedTeams = await directTeams();
+    assert.ok(swappedTeams.a.includes(bId) && swappedTeams.b.includes(aId), "direct swap");
+    assert.equal(swappedTeams.a.length + swappedTeams.b.length, 10);
+    assert.equal(swappedTeams.edited, true);
+    const directDiff = await page.evaluate(() => Math.abs(teamScore(lastTeams.teamA, lastTeams.scoreMode) - teamScore(lastTeams.teamB, lastTeams.scoreMode)));
+    assert.ok((await page.locator("#teamScoreboard").textContent()).includes(`점수차 ${directDiff}`));
+    assert.ok((await page.locator("#teamEditHint").textContent()).includes("↔"));
+    assert.ok((await page.evaluate(() => buildTeamResultText())).startsWith("[랜덤 편성(수정됨) · 인게임 티어 기준"));
+    await page.click("#undoTeamSwapBtn");
+    assert.deepEqual(await directTeams(), originalTeams, "undo restores the teams");
+    await rowOf(aId).focus();
+    await page.keyboard.press("Enter");
+    await rowOf(bId).focus();
+    await page.keyboard.press("Space");
+    assert.ok((await directTeams()).a.includes(bId), "keyboard swap");
+    await page.click("#editTeamsBtn");
+    assert.equal(await page.locator("#teamEditHint").isVisible(), false);
+    assert.equal(await page.locator("#teamAList .team-member-row").first().getAttribute("role"), null);
+    // 같은 10명의 조합은 126가지뿐이라 앞에서 저장한 구성과 우연히 겹칠 수 있으므로 보드를 비우고 저장
+    await page.evaluate(() => { savedResults.length = 0; renderSavedBoard(); });
+    await page.click("#saveResultBtn");
+    assert.ok((await page.locator("#savedBoard").textContent()).includes("랜덤 편성(수정됨)"));
+
+    // 팀 편집 (모집 4팀): 다른 팀끼리 맞바꾸고 최대 점수차·복사 문구 갱신, 다시 짜면 편집 종료와 새로 섞기
+    await page.selectOption("#recruitmentSelect", "group20");
+    await page.click("#selectRecruitmentMembersBtn");
+    await page.click("#randomTeamBtn");
+    assert.equal(await page.locator("#recruitmentTeamGrid .team-card").count(), 4);
+    const recruitTeams = () => page.evaluate(() => lastRecruitmentResult.teams.map(team => team.map(m => m.discordId)));
+    await page.click("#editRecruitmentTeamsBtn");
+    const firstRow = page.locator('#recruitmentTeamGrid [data-team-index="0"] .team-member-row').first();
+    const thirdRow = page.locator('#recruitmentTeamGrid [data-team-index="2"] .team-member-row').first();
+    const r1 = await firstRow.getAttribute("data-member-id");
+    const r3 = await thirdRow.getAttribute("data-member-id");
+    await firstRow.click();
+    await thirdRow.click();
+    const recruitAfter = await recruitTeams();
+    assert.ok(recruitAfter[0].includes(r3) && recruitAfter[2].includes(r1), "recruitment swap");
+    assert.ok(recruitAfter.every(team => team.length === 5));
+    const recruitSpread = await page.evaluate(() => multiTeamMetric(lastRecruitmentResult.teams, lastRecruitmentResult.scoreMode).spread);
+    assert.ok((await page.locator("#recruitmentResultSummary").textContent()).includes(`최대 점수차 ${recruitSpread}점`));
+    assert.ok((await page.locator("#recruitmentResultLabel").textContent()).includes("(수정됨)"));
+    assert.ok((await page.evaluate(() => buildRecruitmentResultText())).includes("랜덤 편성(수정됨)"));
+    await page.click("#rerollRecruitmentTeamsBtn");
+    assert.equal(await page.locator("#recruitmentTeamEditHint").isVisible(), false);
+    assert.equal(await page.evaluate(() => lastRecruitmentResult.edited), false);
+    assert.equal(await isDealing("#recruitmentResult"), true, "recruitment reroll is dealt in");
+
+    // 밸런스 후보 다시 짜기 연출, 움직임 줄이기 설정에서는 연출 없이 결과만 바뀜
+    await page.click("#internalBalanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    await page.click("#rerollBalanceBtn");
+    assert.equal(await isDealing("#balanceModalList"), true, "balance reroll is dealt in");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.waitForTimeout(950);
+    await page.click("#rerollBalanceBtn");
+    assert.equal(await isDealing("#balanceModalList"), false, "no deal animation with reduced motion");
+    assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.click("#balanceModalClose");
+    await page.click("#exitRecruitmentModeBtn");
+    await assertNoInjectedHtml("team edit rows");
+    console.log("PASS: team edit swap, undo, keyboard and save in 2-team and 4-team results, deal animation on reroll, reduced motion");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.selectOption("#recruitmentSelect", "group20");

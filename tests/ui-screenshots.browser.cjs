@@ -95,6 +95,14 @@ async function run() {
       await page.locator("#teamResult").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));
       await page.waitForTimeout(900);
       await shot(page, `${prefix}-team-result.png`);
+      // 팀 편집: 한 번 맞바꾼 뒤 다음 사람을 고른 상태
+      await page.click("#editTeamsBtn");
+      await page.locator("#teamAList .team-member-row").nth(0).click();
+      await page.locator("#teamBList .team-member-row").nth(0).click();
+      await page.locator("#teamAList .team-member-row").nth(1).click();
+      await page.locator("#teamResult").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));
+      await shot(page, `${prefix}-team-edit.png`);
+      await page.click("#editTeamsBtn");
       await page.click("#manualTeamBtn");
       const manualRows = page.locator(".manual-row");
       for (let i = 0; i < 7; i++) await manualRows.nth(i).locator(`[data-team="${i % 2 ? "B" : "A"}"]`).click();

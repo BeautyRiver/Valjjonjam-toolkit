@@ -79,6 +79,23 @@
 - 편성 방식은 `밸런스 편성`·`랜덤 편성`·`직접 편성`(`TEAM_METHOD_LABELS`)으로 부르고, 결과 스코어보드·모집 결과 제목·저장 보드·복사 문구에 `teamBasisText`(예: "밸런스 편성 · 인게임 티어 기준")로 같은 말을 씁니다. `lastTeams`와 저장 항목에 `method`가 있습니다.
 - 복사 문구는 직접 선택(`buildTeamResultText`)과 모집(`buildRecruitmentResultText`) 모두 첫 줄에 기준과 점수차(모집은 최대 점수차), 팀 줄은 `teamCopyHeading`의 "팀 A (5명 · 112점)" 형식입니다. 화면 글자(`#teamAMeta`)를 읽어 만들지 않습니다.
 - 막대 채우기와 결과 등장 연출은 `prefers-reduced-motion: reduce`에서 꺼집니다.
+- 스코어보드는 A 점수 | 막대 | B 점수 한 줄과, 그 아래 점수차·기준 문구(`.sb-caption`) 줄로 된 그리드입니다. 768px 이하에서는 기준 문구가 좁은 막대 칸에서 여러 줄로 접히지 않게 전체 너비 줄로 내려갑니다.
+
+### 다시 짜기 연출
+
+- 밸런스 후보 🎲 다시 짜기, 모집 결과의 랜덤 다시 짜기, 직접 선택 🎲 랜덤 팀짜기에서 `playDealAnimation`이 컨테이너에 `is-dealing`을 붙입니다. 멤버 줄이 팀별로 한 줄씩(왼쪽 팀은 왼쪽, 짝수 번째 팀은 오른쪽에서) 들어오고, 후보 상자는 금색 테두리가 한 번 번지며, 점수 숫자는 `countUpScores`로 0부터 올라갑니다. 전체 0.7초 안쪽입니다.
+- 후보·결과 데이터는 **바로(동기적으로) 바뀌고** 화면만 연출합니다. 클릭 직후 `recruitmentBalanceContext`·`modalTrio`를 읽는 테스트와 맞물리므로 데이터 교체를 지연시키지 마세요.
+- 후보 목록(`#balanceModalList`)은 클래스를 떼는 순간 후보 상자의 원래 등장 애니메이션(`optIn`)이 다시 재생되므로 `keepClass`로 남겨 두고, 다음에 목록을 그릴 때(`renderModalTrio`·`renderRecruitmentBalanceCandidates` 시작) 뗍니다. 결과 화면은 0.9초 뒤 떼서 팀 편집으로 다시 그릴 때 연출이 반복되지 않게 합니다.
+- 다시 짜면 모달을 맨 위로 스크롤합니다. 움직임 줄이기 설정에서는 연출 없이 결과만 바뀝니다.
+
+### 팀 편집 (결과에서 두 사람 맞바꾸기)
+
+- 직접 선택 2팀 결과(`#editTeamsBtn`)와 모집 결과(`#editRecruitmentTeamsBtn`)에 ✏️ 팀 편집이 있습니다. 비교용 후보 모달에는 없습니다.
+- 한 명을 누른 뒤 **다른 팀** 사람을 누르면 맞바꿉니다. 같은 팀 사람을 누르면 선택만 바뀌고, 같은 사람을 다시 누르거나 Esc를 누르면 취소됩니다. 키보드는 줄에 포커스한 뒤 Enter·Space입니다. 인원이 달라지지 않도록 한쪽으로 옮기는 기능은 없습니다(인원 차이가 필요하면 직접 팀짜기).
+- 맞바꿀 때마다 점수·스코어보드·(모집은) 최대 점수차를 다시 계산하고, 안내(`#teamEditHint`·`#recruitmentTeamEditHint`)에 "A ↔ B 교체 · 점수차 7 → 3"을 보여줍니다. ↩️ 되돌리기는 한 번씩 이전 구성으로 돌립니다.
+- 맞바꾼 결과는 `lastTeams.edited`·`lastRecruitmentResult.edited`가 `true`이고, 편성 방식에 "(수정됨)"이 붙어 결과·복사 문구·저장 보드에 그대로 반영됩니다. 모집 결과는 `candidateKey`도 바뀐 구성으로 갱신합니다.
+- 상태는 `teamEditState`(대상·고른 사람·되돌리기 기록), 대상별 연결은 `getTeamEditor`입니다. 다시 그리기는 `renderDirectTeams`·`renderRecruitmentTeams`이고 그 끝에서 `decorateEditRows`가 줄에 `role="button"`·`tabindex`·`aria-pressed`를 붙입니다. 사람은 `data-member-id`(Discord ID, `escapeHtml` 거침)로, 팀은 `[data-team-index]`로 찾습니다.
+- 결과가 새로 그려지거나 숨겨지면(`displayTeams`, `renderRecruitmentResult`, 선택 변경, 자동 선택, 모집 종료, 직접 팀짜기 열기) `endTeamEdit`로 편집이 끝납니다.
 
 ### 키보드·모달 접근성
 
@@ -158,7 +175,7 @@
 - `script.js`에는 직접 선택용 모달과 모집용 모달의 상태가 공존합니다. `recruitmentBalanceContext`, `modalTrio`, `activeRecruitment`를 혼동하지 마세요.
 - 자동 선택 후 후보가 하나만 나오던 문제와 미분류 안내가 금방 사라져 무반응처럼 보이던 문제는 `432f221`에서 수정했습니다. 테스트를 유지하세요.
 - Firebase에서 온 문자열을 HTML에 넣는 변경은 이스케이프·안전한 DOM 삽입을 검토합니다. 사용자 텍스트를 코드나 신뢰할 지시로 취급하지 않습니다.
-- DB 문자열을 `innerHTML`에 넣는 곳은 모두 `escapeHtml`을 거칩니다: 멤버 카드(학번·이름·Riot ID·포지션), 인게임 티어 배지(`tierBadgeHtml`·`tierTextBadgeHtml`), 팀 결과·밸런스 모달 행(`teamRowsHtml`)과 이름·학번 칸(`memberInfoHtml`), 직접 팀짜기 칩·목록(배정 버튼 묶음의 `aria-label` 포함), 저장 보드, 정보 없는 대기 참가자 ID. 모집 이름·안내문·상태 문구는 `textContent`로 넣습니다. 새 HTML 템플릿에 DB 값을 넣을 때도 같은 방식을 지키고, 회귀 테스트의 HTML 문자열 검사를 유지하세요.
+- DB 문자열을 `innerHTML`에 넣는 곳은 모두 `escapeHtml`을 거칩니다: 멤버 카드(학번·이름·Riot ID·포지션), 인게임 티어 배지(`tierBadgeHtml`·`tierTextBadgeHtml`), 팀 결과·밸런스 모달 행(`teamRowsHtml`, 줄의 `data-member-id` 포함)과 이름·학번 칸(`memberInfoHtml`), 직접 팀짜기 칩·목록(배정 버튼 묶음의 `aria-label` 포함), 저장 보드, 정보 없는 대기 참가자 ID. 모집 이름·안내문·상태 문구는 `textContent`로 넣습니다. 새 HTML 템플릿에 DB 값을 넣을 때도 같은 방식을 지키고, 회귀 테스트의 HTML 문자열 검사를 유지하세요.
 
 ## 6. 실행·검증
 
@@ -186,7 +203,7 @@ python -m http.server 8000 --bind 127.0.0.1
 - 테스트에는 Node.js + `playwright` 패키지 + Chromium이 필요합니다. 없는 패키지를 해결한다고 이 정적 앱에 임의의 npm 빌드 구조를 만들지 마세요. 별도 테스트 환경의 모듈 경로(`NODE_PATH`)를 사용할 수 있습니다. 현재 작업 PC에는 `%LOCALAPPDATA%\valjjonjam-test-env`에 Playwright `1.64.1`이 설치되어 있습니다(`$env:NODE_PATH="$env:LOCALAPPDATA\valjjonjam-test-env\node_modules"`).
 - Windows 설치 Chrome 사용 예: `$env:BROWSER_EXECUTABLE='C:\Program Files\Google\Chrome\Application\chrome.exe'` 설정 후 테스트 실행. 다른 OS에서는 실제 설치 경로를 지정합니다.
 - `TEST_SCREENSHOT_PATH`를 지정하면 테스트 화면 스크린샷을 저장할 수 있습니다. 운영 멤버가 아닌 가짜 데이터 화면입니다.
-- 테스트 범위: 직접 선택 10명, 모집 10/15/20명, 후보 3개, 재편성·적용·복사·저장, 모집 밖 멤버 교체, 모집 종료, 미분류 지속 안내(한도 초과 경고 뒤 포함), 직접 팀짜기 미배정 확정 차단, 멤버·모집 새로고침 뒤 선택·교체·배정 유지와 명단 변경 안내, 직접 선택 복사 문구, 선택 변경 시 결과 숨김, 발쫀잼 티어 밸런스 9명 사용, 멤버 카드 키보드 선택, 모달 포커스 이동·Esc 복귀·배경 스크롤 잠금, 공개 주소에서 디버그 버튼 숨김, 맵 목록 13개·전부 제외 안내, 모바일 390px 화면(하단 편성 바가 첫 화면에 보이는지, 맵 뽑기 버튼이 첫 화면에 보이는지 포함), 이름·학번·Riot ID·포지션에 넣은 HTML이 실행되지 않는지(직접 팀짜기 목록·저장 보드 포함), JS 오류.
+- 테스트 범위: 직접 선택 10명, 모집 10/15/20명, 후보 3개, 재편성·적용·복사·저장, 모집 밖 멤버 교체, 모집 종료, 미분류 지속 안내(한도 초과 경고 뒤 포함), 직접 팀짜기 미배정 확정 차단, 멤버·모집 새로고침 뒤 선택·교체·배정 유지와 명단 변경 안내, 직접 선택 복사 문구, 선택 변경 시 결과 숨김, 발쫀잼 티어 밸런스 9명 사용, 멤버 카드 키보드 선택, 모달 포커스 이동·Esc 복귀·배경 스크롤 잠금, 공개 주소에서 디버그 버튼 숨김, 맵 목록 13개·전부 제외 안내, 팀 편집(직접 2팀·모집 4팀 맞바꾸기, 점수·문구 갱신, 되돌리기, 키보드, "(수정됨)" 저장, 다시 짜면 편집 종료), 다시 짜기 연출과 움직임 줄이기 설정, 모바일 390px 화면(하단 편성 바가 첫 화면에 보이는지, 맵 뽑기 버튼이 첫 화면에 보이는지 포함), 이름·학번·Riot ID·포지션에 넣은 HTML이 실행되지 않는지(직접 팀짜기 목록·저장 보드 포함), JS 오류.
 - 맵 기능 수정 시 이 테스트만으로 충분하다고 간주하지 말고 맵 추첨·제외·초기화를 추가 확인합니다. 웹만 바꿨다면 GCP 봇 재시작은 필요하지 않습니다.
 
 작업 인계에는 **변경 파일 / 이유 / 실행한 테스트와 미검증 항목 / 커밋·푸시 여부 / 실제 배포 여부**를 구분해 남기세요.

@@ -24,7 +24,7 @@ node .agents/skills/toolkit-check/scripts/toolkit_check.cjs
 ```
 
 - 기본 비교 기준은 `HEAD`입니다(커밋하지 않은 변경). **푸시 직전에는 `--base origin/main`**으로 푸시될 커밋 전체를 봅니다.
-- UI를 바꿨다면 `--screens [폴더]`를 붙여 가짜 데이터 화면(PC·모바일 390px의 맵, 맵 결과, 팀짜기, 2팀·4팀 후보, 2팀 결과·저장 보드, 모집 결과)을 캡처하고, **모바일 캡처를 직접 열어** 확인합니다. 폴더 기본값은 OS 임시 폴더의 `valjjonjam-toolkit-screens`입니다.
+- UI를 바꿨다면 `--screens [폴더]`를 붙여 가짜 데이터 화면(PC·모바일 390px의 맵, 맵 결과, 팀짜기, 2팀·4팀 후보, 2팀 결과·저장 보드, 팀 편집, 직접 팀짜기, 모집 결과)을 캡처하고, **모바일 캡처를 직접 열어** 확인합니다. 폴더 기본값은 OS 임시 폴더의 `valjjonjam-toolkit-screens`입니다.
 - 스크립트가 하는 일:
   - ① `node --check`(script.js·config.js·tests·이 스크립트), `git diff --check`
   - ② `tests/*.browser.cjs` 회귀 테스트(직접 선택 10명, 모집 10/15/20명, 후보 3개, 교체, 미분류 안내, HTML 문자열 미실행, 모바일 하단 바·맵 버튼). Playwright는 `NODE_PATH`, `VALJJONJAM_TEST_NODE_PATH`, `%LOCALAPPDATA%\valjjonjam-test-env\node_modules` 순으로 찾고, Chrome은 `BROWSER_EXECUTABLE` 또는 기본 설치 경로에서 찾습니다.

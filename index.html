@@ -202,9 +202,12 @@
                     </div>
                     <div id="recruitmentTeamGrid" class="team-result-grid multi-team-grid"></div>
                     <div id="recruitmentReserveList" class="recruitment-reserves hidden"></div>
+                    <p id="recruitmentTeamEditHint" class="team-edit-hint" aria-live="polite" hidden></p>
                     <div class="result-actions">
                         <button id="rerollRecruitmentTeamsBtn" class="primary-btn">🎲 다른 균형으로 다시 짜기</button>
                         <button id="copyRecruitmentResultBtn" class="secondary-btn">📋 결과 복사하기</button>
+                        <button id="editRecruitmentTeamsBtn" class="secondary-btn" aria-pressed="false">✏️ 팀 편집</button>
+                        <button id="undoRecruitmentSwapBtn" class="secondary-btn" hidden disabled>↩️ 되돌리기</button>
                     </div>
                 </div>
 
@@ -233,19 +236,22 @@
                                 <span class="team-label"><span class="team-word">팀</span><span class="team-letter">A</span></span>
                                 <span class="team-header-side"><span id="teamAMeta" class="team-meta"></span></span>
                             </div>
-                            <div id="teamAList" class="team-member-list"></div>
+                            <div id="teamAList" class="team-member-list" data-team-index="0"></div>
                         </div>
                         <div class="team-card card team-b-card">
                             <div class="team-header">
                                 <span class="team-label"><span class="team-word">팀</span><span class="team-letter">B</span></span>
                                 <span class="team-header-side"><span id="teamBMeta" class="team-meta"></span></span>
                             </div>
-                            <div id="teamBList" class="team-member-list"></div>
+                            <div id="teamBList" class="team-member-list" data-team-index="1"></div>
                         </div>
                     </div>
+                    <p id="teamEditHint" class="team-edit-hint" aria-live="polite" hidden></p>
                     <div class="result-actions">
                         <button id="saveResultBtn" class="primary-btn">💾 보드에 저장</button>
                         <button id="copyResultBtn" class="secondary-btn">📋 결과 복사하기</button>
+                        <button id="editTeamsBtn" class="secondary-btn" aria-pressed="false">✏️ 팀 편집</button>
+                        <button id="undoTeamSwapBtn" class="secondary-btn" hidden disabled>↩️ 되돌리기</button>
                     </div>
                 </div>
 

@@ -640,6 +640,7 @@ function renderMemberGrid() {
 
 // 선택이 바뀌면 이전 결과는 지금 선택과 맞지 않으므로 숨김 (직접 선택 결과는 저장 보드에서 다시 불러올 수 있음)
 function handleSelectionChange() {
+  endTeamEdit();
   recruitmentResultEl.classList.add("hidden");
   lastRecruitmentResult = null;
   teamResultEl.classList.add("hidden");
@@ -772,9 +773,10 @@ function memberInfoHtml(m) {
 }
 
 // 팀 멤버 행들의 HTML (재사용: 결과 화면 + 모달 + 대기 명단)
+// data-member-id는 팀 편집에서 맞바꿀 사람을 찾는 데, --i는 다시 짜기 때 한 줄씩 나눠 주는 순서에 씀
 function teamRowsHtml(team, scoreMode = activeScoreMode) {
-  return team.map(m => `
-    <div class="team-member-row">
+  return team.map((m, i) => `
+    <div class="team-member-row" data-member-id="${escapeHtml(m.discordId)}" style="--i:${i}">
       ${memberPortraitHtml(m, scoreMode)}
       ${memberInfoHtml(m)}
       <span class="team-member-tier">${memberTierLabelHtml(m, scoreMode)}</span>
@@ -785,13 +787,14 @@ function teamRowsHtml(team, scoreMode = activeScoreMode) {
 // 편성 방식 이름: 결과 화면·복사 문구·저장 보드에서 같은 말을 씀
 const TEAM_METHOD_LABELS = { balance: "밸런스 편성", random: "랜덤 편성", manual: "직접 편성" };
 
-function teamMethodLabel(method) {
-  return TEAM_METHOD_LABELS[method] || TEAM_METHOD_LABELS.balance;
+// edited: 팀 편집으로 사람을 맞바꾼 결과면 "(수정됨)"을 붙임
+function teamMethodLabel(method, edited = false) {
+  return `${TEAM_METHOD_LABELS[method] || TEAM_METHOD_LABELS.balance}${edited ? "(수정됨)" : ""}`;
 }
 
 // 결과의 기준 문구: "밸런스 편성 · 인게임 티어 기준"
-function teamBasisText(scoreMode, method) {
-  return `${teamMethodLabel(method)} · ${scoreModeLabel(scoreMode)} 기준`;
+function teamBasisText(scoreMode, method, edited = false) {
+  return `${teamMethodLabel(method, edited)} · ${scoreModeLabel(scoreMode)} 기준`;
 }
 
 // 팀 카드 머리: "팀" + 큰 팀 글자, 오른쪽에 인원(과 점수)
@@ -816,11 +819,9 @@ function scoreboardHtml(sA, sB, basisText = "") {
   return `
     <div class="scoreboard" style="--a-share:${share.toFixed(2)}%">
       <span class="sb-side sb-a"><span class="sb-letter">A</span><span class="sb-score">${sA}</span></span>
-      <span class="sb-center">
-        <span class="sb-bar" aria-hidden="true"><span class="sb-fill sb-fill-a"></span><span class="sb-fill sb-fill-b"></span></span>
-        <span class="sb-caption"><span class="sb-diff">점수차 ${Math.abs(sA - sB)}</span>${basis}</span>
-      </span>
+      <span class="sb-bar" aria-hidden="true"><span class="sb-fill sb-fill-a"></span><span class="sb-fill sb-fill-b"></span></span>
       <span class="sb-side sb-b"><span class="sb-score">${sB}</span><span class="sb-letter">B</span></span>
+      <span class="sb-caption"><span class="sb-diff">점수차 ${Math.abs(sA - sB)}</span>${basis}</span>
     </div>
   `;
 }
@@ -851,27 +852,37 @@ function renderTeamList(container, team, scoreMode = activeScoreMode) {
 }
 
 // 결과 복사용으로 마지막 팀 구성 보관
-let lastTeams = { teamA: [], teamB: [], scoreMode: SCORE_MODE_GAME, method: "balance" };
+let lastTeams = { teamA: [], teamB: [], scoreMode: SCORE_MODE_GAME, method: "balance", edited: false };
 
 // 팀 내부를 티어 내림차순으로 정렬
 function sortByTier(team, scoreMode = activeScoreMode) {
   return [...team].sort((a, b) => memberScore(b, scoreMode) - memberScore(a, scoreMode));
 }
 
-// method: "balance" | "random" | "manual"
-function displayTeams(teamA, teamB, scoreMode = activeScoreMode, method = "balance") {
+// method: "balance" | "random" | "manual", edited: 팀 편집으로 맞바꾼 적이 있는지
+function displayTeams(teamA, teamB, scoreMode = activeScoreMode, method = "balance", edited = false) {
   activeScoreMode = scoreMode;
-  teamA = sortByTier(teamA, scoreMode);
-  teamB = sortByTier(teamB, scoreMode);
-  lastTeams = { teamA, teamB, scoreMode, method };
+  lastTeams = {
+    teamA: sortByTier(teamA, scoreMode),
+    teamB: sortByTier(teamB, scoreMode),
+    scoreMode, method, edited
+  };
+  endTeamEdit();
+  renderDirectTeams();
+  teamResultEl.classList.remove("hidden");
+  teamResultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// lastTeams를 화면에 그림 (팀 편집으로 맞바꾼 뒤에도 이 함수로 다시 그림)
+function renderDirectTeams() {
+  const { teamA, teamB, scoreMode, method, edited } = lastTeams;
   const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
-  teamScoreboardEl.innerHTML = scoreboardHtml(sA, sB, teamBasisText(scoreMode, method));
+  teamScoreboardEl.innerHTML = scoreboardHtml(sA, sB, teamBasisText(scoreMode, method, edited));
   teamAMetaEl.textContent = `${teamA.length}명`;
   teamBMetaEl.textContent = `${teamB.length}명`;
   renderTeamList(teamAListEl, teamA, scoreMode);
   renderTeamList(teamBListEl, teamB, scoreMode);
-  teamResultEl.classList.remove("hidden");
-  teamResultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  decorateEditRows("direct");
 }
 
 // 탭 전환
@@ -1072,6 +1083,7 @@ function pickBalanceTrio() {
 }
 
 function renderModalTrio() {
+  balanceModalListEl.classList.remove("is-dealing");   // 처음 열 때는 원래 등장 애니메이션, 다시 짜기면 이후 playDealAnimation이 다시 붙임
   modalTrio = pickBalanceTrio();
 
   if (!modalTrio.length) {
@@ -1084,7 +1096,7 @@ function renderModalTrio() {
     const teamA = sortByTier(c.aIds.map(i => members[i]));
     const teamB = sortByTier(c.bIds.map(i => members[i]));
     return `
-      <div class="modal-option" style="animation-delay:${idx * 0.08}s" data-opt="${idx}">
+      <div class="modal-option" style="animation-delay:${idx * 0.08}s;--opt:${idx}" data-opt="${idx}">
         <div class="opt-head">
           <span class="opt-title">옵션 ${idx + 1}</span>
         </div>
@@ -1224,11 +1236,54 @@ internalBalanceTeamBtn.addEventListener("click", () => {
   openBalanceModal();
 });
 
+// ===== 다시 짜기 연출 =====
+// 후보·결과는 바로(동기적으로) 바꾸고, 화면만 카드를 다시 나눠 주듯 보이게 함.
+// 멤버 줄이 팀별로 한 줄씩 들어오고, 점수 숫자는 0부터 올라가며 멈춤. 전체 0.7초 안쪽.
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+// keepClass: 후보 목록처럼 원래 등장 애니메이션이 있는 곳은 클래스를 떼는 순간 그 애니메이션이 다시 재생되므로
+// 시간이 지나도 떼지 않고, 다음에 목록을 다시 그릴 때 뗌 (결과 화면은 팀 편집으로 다시 그릴 때 재생되지 않게 0.9초 뒤 뗌)
+function playDealAnimation(container, { keepClass = false } = {}) {
+  if (!container || prefersReducedMotion()) return;
+  container.classList.remove("is-dealing");
+  void container.offsetWidth;   // 연속으로 눌러도 처음부터 다시 재생
+  container.classList.add("is-dealing");
+  clearTimeout(container._dealTimer);
+  if (!keepClass) container._dealTimer = setTimeout(() => container.classList.remove("is-dealing"), 900);
+  countUpScores(container);
+}
+
+function countUpScores(container) {
+  const targets = [...container.querySelectorAll(".sb-score, .team-score-num")]
+    .map(el => [el, Number(el.textContent)])
+    .filter(([, value]) => Number.isFinite(value));
+  if (!targets.length) return;
+  const start = performance.now();
+  const duration = 520;
+  const tick = now => {
+    const progress = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    targets.forEach(([el, value]) => {
+      if (el.isConnected) el.textContent = String(Math.round(value * eased));
+    });
+    if (progress < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 rerollBalanceBtn.addEventListener("click", () => {
+  rerollBalanceBtn.classList.remove("rolling");
+  void rerollBalanceBtn.offsetWidth;
   rerollBalanceBtn.classList.add("rolling");
+  clearTimeout(rerollBalanceBtn._rollTimer);
+  rerollBalanceBtn._rollTimer = setTimeout(() => rerollBalanceBtn.classList.remove("rolling"), 600);
   if (recruitmentBalanceContext) renderRecruitmentBalanceCandidates();
   else renderModalTrio();
-  setTimeout(() => rerollBalanceBtn.classList.remove("rolling"), 500);
+  // 모바일에서 아래로 내려 본 상태여도 바뀐 후보가 바로 보이게 맨 위로
+  balanceModalEl.querySelector(".modal-box")?.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  playDealAnimation(balanceModalListEl, { keepClass: true });
 });
 
 // 위 3개 후보 중 점수차가 가장 작은 구성을 저장
@@ -1264,6 +1319,7 @@ randomTeamBtn.addEventListener("click", () => {
   }
   const { teamA, teamB } = buildTeams("random");
   displayTeams(teamA, teamB, SCORE_MODE_GAME, "random");
+  playDealAnimation(teamResultEl);   // 랜덤은 누를 때마다 새로 섞이므로 같은 연출
 });
 
 // 직접 팀짜기
@@ -1288,6 +1344,7 @@ function syncManualAssign() {
 function openManualTeam() {
   setTeamBuilderNotice();
   syncManualAssign();
+  endTeamEdit();
   teamResultEl.classList.add("hidden");
   manualSectionEl.classList.remove("hidden");
   renderManualSection();
@@ -1369,10 +1426,10 @@ function memberLine(m, scoreMode) {
 
 // 직접 선택 결과 복사 문구 (모집 결과 복사와 같은 형식)
 function buildTeamResultText() {
-  const { teamA, teamB, scoreMode, method } = lastTeams;
+  const { teamA, teamB, scoreMode, method, edited } = lastTeams;
   const diff = Math.abs(teamScore(teamA, scoreMode) - teamScore(teamB, scoreMode));
   return [
-    `[${teamBasisText(scoreMode, method)} · 점수차 ${diff}점]`,
+    `[${teamBasisText(scoreMode, method, edited)} · 점수차 ${diff}점]`,
     "",
     teamCopyHeading("A", teamA, scoreMode),
     ...teamA.map(m => memberLine(m, scoreMode)),
@@ -1416,19 +1473,19 @@ function teamsKey(teamA, teamB) {
 }
 
 // 보드에 저장 (중복/가득참 검사). 반환: "ok" | "dup" | "full" | "empty"
-function saveTeams(teamA, teamB, scoreMode = activeScoreMode, method = "balance") {
+function saveTeams(teamA, teamB, scoreMode = activeScoreMode, method = "balance", edited = false) {
   if (!teamA.length && !teamB.length) return "empty";
   const key = teamsKey(teamA, teamB);
   if (savedResults.some(r => r.key === key)) return "dup";
   if (savedResults.length >= MAX_SAVED) return "full";
   const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
-  savedResults.push({ teamA, teamB, sA, sB, diff: Math.abs(sA - sB), key, scoreMode, method });
+  savedResults.push({ teamA, teamB, sA, sB, diff: Math.abs(sA - sB), key, scoreMode, method, edited });
   renderSavedBoard();
   return "ok";
 }
 
 saveResultBtn.addEventListener("click", () => {
-  const status = saveTeams(lastTeams.teamA, lastTeams.teamB, lastTeams.scoreMode, lastTeams.method);
+  const status = saveTeams(lastTeams.teamA, lastTeams.teamB, lastTeams.scoreMode, lastTeams.method, lastTeams.edited);
   if (status === "dup")  flashSaveBtn("이미 저장된 구성!");
   else if (status === "full") flashSaveBtn(`최대 ${MAX_SAVED}개까지!`);
   else if (status === "ok")   flashSaveBtn("✅ 저장됨!");
@@ -1459,7 +1516,7 @@ function renderSavedBoard() {
       <div class="saved-item card" data-idx="${idx}">
         <div class="saved-item-head">
           <span class="saved-item-title">#${idx + 1}</span>
-          <span class="saved-item-basis">${teamBasisText(r.scoreMode, r.method)}</span>
+          <span class="saved-item-basis">${teamBasisText(r.scoreMode, r.method, r.edited)}</span>
         </div>
         ${scoreboardHtml(r.sA, r.sB)}
         <div class="saved-teams">
@@ -1477,7 +1534,7 @@ function renderSavedBoard() {
   savedBoardEl.querySelectorAll(".saved-load").forEach(btn => {
     btn.addEventListener("click", () => {
       const r = savedResults[parseInt(btn.dataset.idx)];
-      if (r) displayTeams(r.teamA, r.teamB, r.scoreMode, r.method);
+      if (r) displayTeams(r.teamA, r.teamB, r.scoreMode, r.method, r.edited);
     });
   });
   savedBoardEl.querySelectorAll(".saved-del").forEach(btn => {
@@ -1625,6 +1682,7 @@ function autoSelectActiveRecruitment() {
   const memberIndexById = new Map(members.map((member, index) => [member.discordId, index]));
   const targetIds = participantIds.slice(0, selectedTeamCount * 5);
 
+  endTeamEdit();
   selectedIndices.clear();
   targetIds.forEach(id => {
     const index = memberIndexById.get(id);
@@ -1663,6 +1721,7 @@ function activateRecruitmentSelection() {
 }
 
 function exitRecruitmentMode() {
+  endTeamEdit();
   activeRecruitment = null;
   activeRecruitmentParticipantIds = null;
   selectedTeamCount = 2;
@@ -1909,7 +1968,7 @@ function multiTeamGridHtml(teams, scoreMode) {
     return `
       <div class="team-card card multi-team-card" style="--team-color:${color}">
         ${teamHeaderHtml(multiTeamLabel(index), team, scoreMode, true)}
-        <div class="team-member-list">${teamRowsHtml(team, scoreMode)}</div>
+        <div class="team-member-list" data-team-index="${index}">${teamRowsHtml(team, scoreMode)}</div>
       </div>
     `;
   }).join("");
@@ -1933,6 +1992,7 @@ function openRecruitmentBalanceModal(recruitment, analysis, scoreMode, reroll) {
 function renderRecruitmentBalanceCandidates() {
   const context = recruitmentBalanceContext;
   if (!context) return;
+  balanceModalListEl.classList.remove("is-dealing");
   const { recruitment, analysis, scoreMode } = context;
   const all = buildMultiTeamCandidates(analysis.mainMembers, analysis.teamCount, scoreMode);
   const previousKeys = new Set(context.candidates.map(candidate => candidate.key));
@@ -1948,7 +2008,7 @@ function renderRecruitmentBalanceCandidates() {
   balanceModalListEl.innerHTML = context.candidates.map((candidate, index) => {
     const teams = candidate.teams.map(team => sortByTier(team, scoreMode));
     return `
-      <div class="modal-option" style="animation-delay:${index * 0.08}s">
+      <div class="modal-option" style="animation-delay:${index * 0.08}s;--opt:${index}">
         <div class="opt-head">
           <span class="opt-title">옵션 ${index + 1}</span>
           <span class="opt-diff">최대 점수차 ${candidate.metric.spread}</span>
@@ -1971,12 +2031,17 @@ function renderRecruitmentBalanceCandidates() {
 }
 
 function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, method) {
-  const teams = candidate.teams.map(team => sortByTier(team, scoreMode));
-  const icon = method === "random" ? "🎲" : scoreMode === SCORE_MODE_INTERNAL ? "🏆" : "⚖️";
-  recruitmentResultLabelEl.textContent = `${icon} ${teamBasisText(scoreMode, method)}`;
-  recruitmentResultTitleEl.textContent = `${recruitmentTypeLabel(recruitment)} · ${recruitment.name}`;
-  recruitmentResultSummaryEl.textContent = `${teams.length}팀 · 최대 점수차 ${candidate.metric.spread}점`;
-  recruitmentTeamGridEl.innerHTML = multiTeamGridHtml(teams, scoreMode);
+  lastRecruitmentResult = {
+    recruitment,
+    analysis,
+    teams: candidate.teams.map(team => sortByTier(team, scoreMode)),
+    scoreMode,
+    method,
+    edited: false,
+    candidateKey: candidate.key
+  };
+  endTeamEdit();
+  renderRecruitmentTeams();
 
   if (analysis.reserves.length) {
     const knownReserves = analysis.reserves.filter(entry => entry.member).map(entry => entry.member);
@@ -2002,16 +2067,19 @@ function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, me
     recruitmentReserveListEl.classList.add("hidden");
   }
 
-  lastRecruitmentResult = {
-    recruitment,
-    analysis,
-    teams,
-    scoreMode,
-    method,
-    candidateKey: candidate.key
-  };
   recruitmentResultEl.classList.remove("hidden");
   recruitmentResultEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// lastRecruitmentResult의 팀·제목·요약을 그림 (팀 편집으로 맞바꾼 뒤에도 이 함수로 다시 그림)
+function renderRecruitmentTeams() {
+  const { recruitment, teams, scoreMode, method, edited } = lastRecruitmentResult;
+  const icon = method === "random" ? "🎲" : scoreMode === SCORE_MODE_INTERNAL ? "🏆" : "⚖️";
+  recruitmentResultLabelEl.textContent = `${icon} ${teamBasisText(scoreMode, method, edited)}`;
+  recruitmentResultTitleEl.textContent = `${recruitmentTypeLabel(recruitment)} · ${recruitment.name}`;
+  recruitmentResultSummaryEl.textContent = `${teams.length}팀 · 최대 점수차 ${multiTeamMetric(teams, scoreMode).spread}점`;
+  recruitmentTeamGridEl.innerHTML = multiTeamGridHtml(teams, scoreMode);
+  decorateEditRows("recruitment");
 }
 
 function buildSelectedRecruitmentTeams(scoreMode, reroll = false, method = "balance") {
@@ -2053,15 +2121,16 @@ function buildSelectedRecruitmentTeams(scoreMode, reroll = false, method = "bala
   teamResultEl.classList.add("hidden");
   manualSectionEl.classList.add("hidden");
   renderRecruitmentResult(activeRecruitment, analysis, candidate, scoreMode, method);
+  playDealAnimation(recruitmentResultEl);   // 여기까지 오는 것은 랜덤 편성뿐: 누를 때마다 새로 섞임
 }
 
 function buildRecruitmentResultText() {
   if (!lastRecruitmentResult) return "";
-  const { recruitment, analysis, teams, scoreMode, method } = lastRecruitmentResult;
+  const { recruitment, analysis, teams, scoreMode, method, edited } = lastRecruitmentResult;
   const spread = multiTeamMetric(teams, scoreMode).spread;
   const lines = [
     `[${recruitmentTypeLabel(recruitment)} · ${recruitment.name}]`,
-    `[${teamBasisText(scoreMode, method)} · 최대 점수차 ${spread}점]`
+    `[${teamBasisText(scoreMode, method, edited)} · 최대 점수차 ${spread}점]`
   ];
 
   teams.forEach((team, index) => {
@@ -2103,6 +2172,214 @@ copyRecruitmentResultBtn.addEventListener("click", () => {
     copyRecruitmentResultBtn.textContent = "복사 실패";
     setTimeout(() => { copyRecruitmentResultBtn.textContent = "📋 결과 복사하기"; }, 2000);
   });
+});
+
+// ===== 팀 편집 (완성된 결과에서 두 사람 맞바꾸기) =====
+// 한 명을 누른 뒤 다른 팀 사람을 누르면 맞바꿈. 같은 팀 사람을 누르면 선택만 바뀜.
+// 맞바꿀 때마다 점수·점수차를 다시 계산하고, 편성 방식에 "(수정됨)"을 붙임. 인원이 달라지지 않도록 이동은 없고 맞바꾸기만.
+const editTeamsBtn = document.getElementById("editTeamsBtn");
+const undoTeamSwapBtn = document.getElementById("undoTeamSwapBtn");
+const teamEditHintEl = document.getElementById("teamEditHint");
+const editRecruitmentTeamsBtn = document.getElementById("editRecruitmentTeamsBtn");
+const undoRecruitmentSwapBtn = document.getElementById("undoRecruitmentSwapBtn");
+const recruitmentTeamEditHintEl = document.getElementById("recruitmentTeamEditHint");
+
+// target: "direct"(직접 선택 2팀) | "recruitment"(모집 결과). picked: { teamIndex, memberId }
+const teamEditState = { target: null, picked: null, history: [], lastSwap: null, startSpread: 0, startEdited: false };
+
+function getTeamEditor(target) {
+  if (target === "direct") {
+    return {
+      root: teamResultEl,
+      editBtn: editTeamsBtn,
+      undoBtn: undoTeamSwapBtn,
+      hintEl: teamEditHintEl,
+      diffLabel: "점수차",
+      teams: () => [lastTeams.teamA, lastTeams.teamB],
+      scoreMode: () => lastTeams.scoreMode,
+      edited: () => lastTeams.edited,
+      setTeams: (teams, edited) => {
+        lastTeams.teamA = sortByTier(teams[0], lastTeams.scoreMode);
+        lastTeams.teamB = sortByTier(teams[1], lastTeams.scoreMode);
+        lastTeams.edited = edited;
+      },
+      render: renderDirectTeams
+    };
+  }
+  return {
+    root: recruitmentTeamGridEl,
+    editBtn: editRecruitmentTeamsBtn,
+    undoBtn: undoRecruitmentSwapBtn,
+    hintEl: recruitmentTeamEditHintEl,
+    diffLabel: "최대 점수차",
+    teams: () => lastRecruitmentResult?.teams || [],
+    scoreMode: () => lastRecruitmentResult?.scoreMode,
+    edited: () => Boolean(lastRecruitmentResult?.edited),
+    setTeams: (teams, edited) => {
+      const scoreMode = lastRecruitmentResult.scoreMode;
+      lastRecruitmentResult.teams = teams.map(team => sortByTier(team, scoreMode));
+      lastRecruitmentResult.candidateKey = multiTeamCandidateKey(lastRecruitmentResult.teams);
+      lastRecruitmentResult.edited = edited;
+    },
+    render: renderRecruitmentTeams
+  };
+}
+
+function teamsSpread(teams, scoreMode) {
+  if (!teams.length) return 0;
+  const scores = teams.map(team => teamScore(team, scoreMode));
+  return Math.max(...scores) - Math.min(...scores);
+}
+
+// 편집 중인 결과의 멤버 줄에 버튼 역할·선택·방금 바뀜 표시를 붙이거나 뗌 (다시 그릴 때마다 호출)
+function decorateEditRows(target) {
+  const root = getTeamEditor(target).root;
+  const editing = teamEditState.target === target;
+  root.classList.toggle("is-editing", editing);
+  root.querySelectorAll("[data-team-index] .team-member-row").forEach(row => {
+    const id = row.dataset.memberId;
+    const picked = editing && teamEditState.picked?.memberId === id;
+    row.classList.toggle("is-picked", picked);
+    row.classList.toggle("just-swapped", editing && !picked && Boolean(teamEditState.lastSwap?.includes(id)));
+    if (editing) {
+      row.setAttribute("role", "button");
+      row.tabIndex = 0;
+      row.setAttribute("aria-pressed", String(picked));
+    } else {
+      row.removeAttribute("role");
+      row.removeAttribute("tabindex");
+      row.removeAttribute("aria-pressed");
+    }
+  });
+}
+
+function teamEditHintText(editor) {
+  const { picked, history } = teamEditState;
+  if (picked) {
+    const member = editor.teams().flat().find(m => m.discordId === picked.memberId);
+    return `${member?.name ?? ""} 선택됨 · 다른 팀에서 맞바꿀 사람을 누르세요. 다시 누르면 선택을 취소합니다.`;
+  }
+  if (!history.length) return "바꿀 사람을 누른 뒤, 다른 팀에서 맞바꿀 사람을 누르세요.";
+  const last = history[history.length - 1];
+  const now = teamsSpread(editor.teams(), editor.scoreMode());
+  return `${last.names[0]} ↔ ${last.names[1]} 교체 · ${editor.diffLabel} ${teamEditState.startSpread} → ${now} · 맞바꾼 횟수 ${history.length}`;
+}
+
+function updateTeamEditControls() {
+  ["direct", "recruitment"].forEach(target => {
+    const editor = getTeamEditor(target);
+    const editing = teamEditState.target === target;
+    editor.editBtn.textContent = editing ? "✅ 편집 완료" : "✏️ 팀 편집";
+    editor.editBtn.setAttribute("aria-pressed", String(editing));
+    editor.undoBtn.hidden = !editing;
+    editor.undoBtn.disabled = !editing || !teamEditState.history.length;
+    editor.hintEl.hidden = !editing;
+    editor.hintEl.textContent = editing ? teamEditHintText(editor) : "";
+  });
+}
+
+function startTeamEdit(target) {
+  endTeamEdit();
+  const editor = getTeamEditor(target);
+  if (!editor.teams().length) return;
+  Object.assign(teamEditState, {
+    target,
+    picked: null,
+    history: [],
+    lastSwap: null,
+    startSpread: teamsSpread(editor.teams(), editor.scoreMode()),
+    startEdited: editor.edited()
+  });
+  decorateEditRows(target);
+  updateTeamEditControls();
+}
+
+// 편집 종료: 결과가 바뀌거나 숨겨질 때도 호출해 편집 표시가 남지 않게 함
+function endTeamEdit() {
+  const target = teamEditState.target;
+  Object.assign(teamEditState, { target: null, picked: null, history: [], lastSwap: null });
+  if (target) decorateEditRows(target);
+  updateTeamEditControls();
+}
+
+function activateEditRow(target, row) {
+  const editor = getTeamEditor(target);
+  const teamIndex = Number(row.closest("[data-team-index]")?.dataset.teamIndex);
+  const memberId = row.dataset.memberId;
+  if (!Number.isInteger(teamIndex) || !memberId) return;
+
+  const picked = teamEditState.picked;
+  if (!picked || picked.teamIndex === teamIndex) {
+    // 첫 선택, 같은 팀 다른 사람으로 선택 변경, 같은 사람 다시 누르면 취소
+    teamEditState.picked = picked?.memberId === memberId ? null : { teamIndex, memberId };
+    teamEditState.lastSwap = null;
+    decorateEditRows(target);
+    updateTeamEditControls();
+    return;
+  }
+
+  const before = editor.teams().map(team => [...team]);
+  const teams = editor.teams().map(team => [...team]);
+  const from = teams[picked.teamIndex];
+  const to = teams[teamIndex];
+  const fromIndex = from.findIndex(m => m.discordId === picked.memberId);
+  const toIndex = to.findIndex(m => m.discordId === memberId);
+  if (fromIndex < 0 || toIndex < 0) return;
+  const a = from[fromIndex];
+  const b = to[toIndex];
+  from[fromIndex] = b;
+  to[toIndex] = a;
+
+  teamEditState.history.push({ before, names: [a.name, b.name], ids: [a.discordId, b.discordId] });
+  teamEditState.picked = null;
+  teamEditState.lastSwap = [a.discordId, b.discordId];
+  editor.setTeams(teams, true);
+  editor.render();
+  updateTeamEditControls();
+  // 키보드로 바꿨다면 옮겨 간 사람에게 포커스를 둬서 위치를 잃지 않게
+  editor.root.querySelector(`.team-member-row[data-member-id="${CSS.escape(a.discordId)}"]`)?.focus({ preventScroll: true });
+}
+
+function undoTeamSwap() {
+  const target = teamEditState.target;
+  if (!target) return;
+  const last = teamEditState.history.pop();
+  if (!last) return;
+  const editor = getTeamEditor(target);
+  teamEditState.picked = null;
+  teamEditState.lastSwap = last.ids;
+  editor.setTeams(last.before, teamEditState.history.length ? true : teamEditState.startEdited);
+  editor.render();
+  updateTeamEditControls();
+}
+
+["direct", "recruitment"].forEach(target => {
+  const { root, editBtn, undoBtn } = getTeamEditor(target);
+  editBtn.addEventListener("click", () => {
+    if (teamEditState.target === target) endTeamEdit();
+    else startTeamEdit(target);
+  });
+  undoBtn.addEventListener("click", undoTeamSwap);
+  root.addEventListener("click", event => {
+    if (teamEditState.target !== target) return;
+    const row = event.target.closest("[data-team-index] .team-member-row");
+    if (row && root.contains(row)) activateEditRow(target, row);
+  });
+  root.addEventListener("keydown", event => {
+    if (teamEditState.target !== target || (event.key !== "Enter" && event.key !== " ")) return;
+    const row = event.target.closest?.("[data-team-index] .team-member-row");
+    if (!row || !root.contains(row)) return;
+    event.preventDefault();
+    activateEditRow(target, row);
+  });
+});
+
+// Esc: 고른 사람이 있으면 선택만 취소 (모달이 열려 있으면 모달 닫기가 우선)
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape" || !teamEditState.picked || document.querySelector(MODAL_LAYER_SELECTOR)) return;
+  teamEditState.picked = null;
+  decorateEditRows(teamEditState.target);
+  updateTeamEditControls();
 });
 
 // users 컬렉션 → 팀짜기용 members 배열

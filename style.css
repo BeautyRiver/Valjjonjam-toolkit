@@ -1198,11 +1198,30 @@ button:disabled {
   display: none;
 }
 
+/* A 점수 | 막대 | B 점수, 막대 아래에 점수차·기준 문구 (좁은 화면에서는 문구가 전체 너비 줄로 내려감) */
 .scoreboard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 20px;
+  column-gap: 20px;
+  row-gap: 10px;
+}
+
+.scoreboard .sb-side {
+  grid-row: 1 / span 2;
+}
+
+.scoreboard .sb-bar {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+}
+
+.scoreboard .sb-caption {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
 }
 
 .sb-side {
@@ -1227,14 +1246,6 @@ button:disabled {
 
 .sb-a .sb-score { color: #ff4655; }
 .sb-b .sb-score { color: #7c5cff; }
-
-.sb-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
 
 .sb-bar {
   position: relative;
@@ -1864,7 +1875,20 @@ button:disabled {
   }
 
   .scoreboard {
-    gap: 12px;
+    column-gap: 12px;
+  }
+
+  /* 좁은 막대 칸에서 기준 문구가 여러 줄로 접히지 않게, 점수 아래 전체 너비 줄로 */
+  .scoreboard .sb-side {
+    grid-row: 1;
+  }
+
+  .scoreboard .sb-bar {
+    align-self: center;
+  }
+
+  .scoreboard .sb-caption {
+    grid-column: 1 / -1;
   }
 
   .sb-score {
@@ -2222,6 +2246,88 @@ button:disabled {
   background: none;
 }
 
+/* ===== 다시 짜기 연출: 멤버 줄을 카드 나눠 주듯 팀별로 한 줄씩 =====
+   JS(playDealAnimation)가 컨테이너에 is-dealing을 잠깐 붙임. 왼쪽(홀수 번째) 팀은 왼쪽에서, 짝수 번째 팀은 오른쪽에서 들어옴 */
+@keyframes rowDeal {
+  from { opacity: 0; transform: translateX(var(--deal-from, -16px)); filter: blur(3px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+@keyframes optReshuffle {
+  from { box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.55); }
+  to   { box-shadow: 0 0 0 0 rgba(255, 209, 102, 0); }
+}
+
+.is-dealing .team-member-row {
+  animation: rowDeal 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--opt, 0) * 70ms + var(--i, 0) * 40ms + 40ms);
+}
+
+.is-dealing .team-card:nth-child(even) .team-member-row {
+  --deal-from: 16px;
+}
+
+/* 후보 상자는 새로 바뀌었다는 표시로 금색 테두리가 한 번 번짐 (늦게 뜨는 순서는 옵션별 inline animation-delay).
+   후보 목록은 다음에 다시 그릴 때까지 is-dealing이 남으므로, 끝난 뒤 hover 그림자를 가리지 않게 fill 없이 */
+.modal-options.is-dealing .modal-option {
+  animation: optReshuffle 0.6s ease-out;
+}
+
+/* ===== 팀 편집: 한 명을 누른 뒤 다른 팀 사람을 누르면 맞바꿈 ===== */
+.result-actions button[hidden] {
+  display: none;
+}
+
+.team-edit-hint {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed rgba(255, 209, 102, 0.35);
+  border-radius: 14px;
+  background: rgba(255, 209, 102, 0.06);
+  color: #ffd166;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.team-edit-hint[hidden] {
+  display: none;
+}
+
+/* 줄 전체를 누를 수 있게: 바깥 여백(-8px)과 안쪽 여백(+8px)을 같이 늘려 글자 위치는 그대로 */
+.is-editing [data-team-index] .team-member-row {
+  margin: 0 -8px;
+  padding-left: 10px;
+  padding-right: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.is-editing [data-team-index] .team-member-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.is-editing [data-team-index] .team-member-row.is-picked {
+  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--team-color, #ffd166) 18%, transparent);
+  box-shadow: inset 0 0 0 2px var(--team-color, #ffd166);
+}
+
+@keyframes swapFlash {
+  from { background: rgba(255, 209, 102, 0.32); }
+}
+
+.is-editing [data-team-index] .team-member-row.just-swapped {
+  background: rgba(255, 209, 102, 0.1);
+  animation: swapFlash 0.9s ease-out;
+}
+
+.is-editing [data-team-index] .team-member-row:focus-visible {
+  outline: 2px solid #ffd166;
+  outline-offset: -2px;
+}
+
 /* ===== 키보드·모달 접근성 ===== */
 /* 모달이 열려 있는 동안 뒤 화면이 스크롤되지 않게 (JS가 html에 modal-open을 붙임) */
 html.modal-open,
@@ -2260,7 +2366,10 @@ html.modal-open body {
 @media (prefers-reduced-motion: reduce) {
   .sb-fill,
   .team-result,
-  .modal-option {
+  .modal-option,
+  .is-dealing .team-member-row,
+  .modal-options.is-dealing .modal-option,
+  .is-editing [data-team-index] .team-member-row.just-swapped {
     animation: none;
   }
 }
