@@ -32,6 +32,8 @@
 | `firestore.rules` | 웹 읽기 허용·클라이언트 쓰기 차단 정책 |
 | `valorant_map_png/`, `valorant_tier_png/` | 맵·인게임 티어 이미지 |
 | `tests/team-builder.browser.cjs` | Playwright 기반 가짜 데이터 브라우저 회귀 테스트 |
+| `tests/ui-screenshots.browser.cjs` | 가짜 데이터로 PC·모바일 화면 캡처 (UI 확인용, 판정 테스트 아님) |
+| `.agents/skills/toolkit-check/` | 수정 후·푸시 전 점검 절차(`SKILL.md`)와 점검 스크립트. `.claude/skills/toolkit-check/`는 이 본문을 가리킴 |
 | `README.md`, `Guide.txt` | 기본 설명과 로컬 실행 안내 |
 
 `index.html`의 로딩 순서는 Firebase compat SDK 10.12.0 → `config.js` → `script.js`입니다. 전역 `firebase`와 `firebaseConfig`를 사용합니다.
@@ -137,12 +139,20 @@
 이 저장소 폴더에서 실행합니다. Python/Node 실행 파일이 실제 설치된 경로인지 먼저 확인하세요.
 
 ```sh
-python -m http.server 8000 --bind 127.0.0.1
-# 브라우저: http://localhost:8000
+# 한 번에 점검 (문법·회귀 테스트·봇 계약·비밀정보·배포 안내). 푸시 직전에는 --base origin/main
+node .agents/skills/toolkit-check/scripts/toolkit_check.cjs
+# UI 변경 시 가짜 데이터 화면 캡처까지
+node .agents/skills/toolkit-check/scripts/toolkit_check.cjs --screens
+
+# 개별 실행
 node --check script.js
 node --check tests/team-builder.browser.cjs
 node tests/team-builder.browser.cjs
+node tests/ui-screenshots.browser.cjs [저장 폴더]
 git diff --check
+
+# 실제 Firestore를 읽는 로컬 서버 (실제 멤버 정보가 보임)
+python -m http.server 8000 --bind 127.0.0.1
 ```
 
 - 서버를 실행하면 실제 화면은 `config.js`에 설정된 Firestore를 읽습니다. 브라우저 회귀 테스트는 이와 달리 **모든 외부 요청을 가로채 가짜 데이터만 사용**합니다.
