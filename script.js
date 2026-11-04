@@ -1239,14 +1239,12 @@ internalBalanceTeamBtn.addEventListener("click", () => {
 // ===== 다시 짜기 연출 =====
 // 후보·결과는 바로(동기적으로) 바꾸고, 화면만 카드를 다시 나눠 주듯 보이게 함.
 // 멤버 줄이 팀별로 한 줄씩 들어오고, 점수 숫자는 0부터 올라가며 멈춤. 전체 0.7초 안쪽.
-function prefersReducedMotion() {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
+// OS의 움직임 줄이기(prefers-reduced-motion) 설정과 상관없이 모두에게 같은 연출을 보여줌 (사용자 결정, 2026-11-04)
 
 // keepClass: 후보 목록처럼 원래 등장 애니메이션이 있는 곳은 클래스를 떼는 순간 그 애니메이션이 다시 재생되므로
 // 시간이 지나도 떼지 않고, 다음에 목록을 다시 그릴 때 뗌 (결과 화면은 팀 편집으로 다시 그릴 때 재생되지 않게 0.9초 뒤 뗌)
 function playDealAnimation(container, { keepClass = false } = {}) {
-  if (!container || prefersReducedMotion()) return;
+  if (!container) return;
   container.classList.remove("is-dealing");
   void container.offsetWidth;   // 연속으로 눌러도 처음부터 다시 재생
   container.classList.add("is-dealing");
@@ -1282,7 +1280,7 @@ rerollBalanceBtn.addEventListener("click", () => {
   if (recruitmentBalanceContext) renderRecruitmentBalanceCandidates();
   else renderModalTrio();
   // 모바일에서 아래로 내려 본 상태여도 바뀐 후보가 바로 보이게 맨 위로
-  balanceModalEl.querySelector(".modal-box")?.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  balanceModalEl.querySelector(".modal-box")?.scrollTo({ top: 0, behavior: "smooth" });
   playDealAnimation(balanceModalListEl, { keepClass: true });
 });
 

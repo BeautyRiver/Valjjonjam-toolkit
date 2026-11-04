@@ -2361,15 +2361,3 @@ html.modal-open body {
     padding: 14px;
   }
 }
-
-/* 움직임 줄이기 설정을 켠 사용자에게는 결과 등장·막대 채우기 연출을 끔 */
-@media (prefers-reduced-motion: reduce) {
-  .sb-fill,
-  .team-result,
-  .modal-option,
-  .is-dealing .team-member-row,
-  .modal-options.is-dealing .modal-option,
-  .is-editing [data-team-index] .team-member-row.just-swapped {
-    animation: none;
-  }
-}

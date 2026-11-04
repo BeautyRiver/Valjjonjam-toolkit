@@ -320,21 +320,22 @@ async function run() {
     assert.equal(await page.evaluate(() => lastRecruitmentResult.edited), false);
     assert.equal(await isDealing("#recruitmentResult"), true, "recruitment reroll is dealt in");
 
-    // 밸런스 후보 다시 짜기 연출, 움직임 줄이기 설정에서는 연출 없이 결과만 바뀜
+    // 밸런스 후보 다시 짜기 연출. OS의 움직임 줄이기 설정을 켜도 같은 연출이 재생되어야 함 (사용자 결정)
     await page.click("#internalBalanceTeamBtn");
     await page.waitForSelector("#balanceModal.open");
     await page.click("#rerollBalanceBtn");
     assert.equal(await isDealing("#balanceModalList"), true, "balance reroll is dealt in");
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.waitForTimeout(950);
     await page.click("#rerollBalanceBtn");
-    assert.equal(await isDealing("#balanceModalList"), false, "no deal animation with reduced motion");
+    assert.equal(await isDealing("#balanceModalList"), true, "deal animation also with reduced motion");
+    assert.ok(await page.evaluate(() => document.getAnimations().some(a => a.animationName === "rowDeal")),
+      "row deal animation actually runs with reduced motion");
     assert.equal(await page.locator("#balanceModalList .modal-option").count(), 3);
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.click("#balanceModalClose");
     await page.click("#exitRecruitmentModeBtn");
     await assertNoInjectedHtml("team edit rows");
-    console.log("PASS: team edit swap, undo, keyboard and save in 2-team and 4-team results, deal animation on reroll, reduced motion");
+    console.log("PASS: team edit swap, undo, keyboard and save in 2-team and 4-team results, deal animation on reroll (also with reduced motion)");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.selectOption("#recruitmentSelect", "group20");
