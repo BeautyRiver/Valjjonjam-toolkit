@@ -21,6 +21,13 @@ async function run() {
       id: String(i + 1), name: `테스트${i + 1}`, internal_tier: tiers[i % 10],
       tier: "골드1", role: ["플렉스"]
     }));
+    // DB 문자열에 HTML이 들어와도 실행되지 않고 글자로만 보이는지 확인 (직접 선택 10명·모든 모집에 포함되는 멤버)
+    const payload = '<img src=x onerror="window.__xss=(window.__xss||0)+1">';
+    Object.assign(users[1], { name: `테스트2${payload}`, student_id: payload, riot_id: payload, role: ["플렉스", payload] });
+    const assertNoInjectedHtml = async where => {
+      assert.equal(await page.evaluate(() => window.__xss), undefined, `HTML executed: ${where}`);
+      assert.equal(await page.locator("img[src='x']").count(), 0, `HTML element injected: ${where}`);
+    };
     await page.addInitScript(({ users }) => {
       const recruitments = [10, 15, 20].map(n => ({
         id: `group${n}`, kind: n === 10 ? "party" : "event", name: `${n}명 테스트`,
@@ -68,7 +75,13 @@ async function run() {
     await page.click("#balanceModalClose");
     await page.click("#savedBoard .saved-load");
     assert.equal(await page.locator("#teamAList .team-member-row").count(), 5);
-    console.log("PASS: direct 10, 3 options, save, reroll and load");
+    assert.ok((await page.locator("#teamResult").textContent()).includes("테스트2<img"));
+    assert.ok((await page.locator("#savedBoard").textContent()).includes("테스트2<img"));
+    await page.click("#manualTeamBtn");
+    await page.locator(".manual-row", { hasText: "테스트2<img" }).locator('[data-team="A"]').click();
+    assert.ok((await page.locator("#manualAChips").textContent()).includes("테스트2<img"));
+    await assertNoInjectedHtml("member card, modal, result, saved board, manual list");
+    console.log("PASS: direct 10, 3 options, save, reroll, load, manual list, HTML in DB strings shown as text");
 
     for (const count of [10, 15, 20]) {
       await page.selectOption("#recruitmentSelect", `group${count}`);
@@ -181,6 +194,7 @@ async function run() {
     await page.evaluate(() => window.scrollTo(0, 0));
     assert.ok(await page.locator("#spinBtn").evaluate(el => el.getBoundingClientRect().bottom <= innerHeight),
       "map draw button is visible on the first mobile screen");
+    await assertNoInjectedHtml("recruitment modals and results");
     assert.deepEqual(errors, []);
     console.log("PASS: mobile 4-team candidates, sticky action dock, map button on first screen, no JS errors");
   } finally {

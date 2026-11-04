@@ -419,7 +419,7 @@ function tierIcon(tier) {
 function tierBadgeHtml(tier) {
   const icon = tierIcon(tier);
   const img = icon ? `<img class="tier-icon" src="${icon}" alt="">` : "";
-  return `${img}<span class="tier-badge ${getTierClass(tier)}">${normalizeTier(tier)}</span>`;
+  return `${img}<span class="tier-badge ${getTierClass(tier)}">${escapeHtml(normalizeTier(tier))}</span>`;
 }
 
 const DEFAULT_MAX_SELECT = 10;
@@ -496,7 +496,7 @@ function renderMemberGrid() {
   memberGridEl.innerHTML = filtered.map(m => {
     const isSelected = selectedIndices.has(m.index);
     const posBadges  = m.positions.map(p =>
-      `<span class="pos-chip ${getPosClass(p)}">${p}</span>`
+      `<span class="pos-chip ${getPosClass(p)}">${escapeHtml(p)}</span>`
     ).join("");
 
     // 학번·이름을 따로 감싸 모바일에서 학번을 둘째 줄로 내리고, 이름이 글자 중간에서 끊기지 않게 함
@@ -641,12 +641,12 @@ function teamScore(team, scoreMode = activeScoreMode) {
 // 팀 멤버 행들의 HTML (재사용: 결과 화면 + 모달)
 function teamRowsHtml(team, scoreMode = activeScoreMode) {
   return team.map(m => {
-    const namePrefix = m.studentId ? `${m.studentId} ` : "";
-    const riot = m.riotId ? `<span class="team-member-riot">${m.riotId}</span>` : "";
+    const namePrefix = m.studentId ? `${escapeHtml(m.studentId)} ` : "";
+    const riot = m.riotId ? `<span class="team-member-riot">${escapeHtml(m.riotId)}</span>` : "";
     return `
     <div class="team-member-row">
       <div class="team-member-info">
-        <span class="team-member-name">${namePrefix}${m.name}</span>
+        <span class="team-member-name">${namePrefix}${escapeHtml(m.name)}</span>
         ${riot}
       </div>
       <span class="team-member-tier">${memberTierBadgeHtml(m, scoreMode)}</span>
@@ -1114,11 +1114,11 @@ function renderManualSection() {
   manualBCountEl.textContent = `${bIdx.length}명`;
 
   manualAChipsEl.innerHTML = aIdx.length
-    ? aIdx.map(i => `<span class="manual-chip">${members[i].name}</span>`).join("")
+    ? aIdx.map(i => `<span class="manual-chip">${escapeHtml(members[i].name)}</span>`).join("")
     : `<span class="manual-chip-empty">없음</span>`;
 
   manualBChipsEl.innerHTML = bIdx.length
-    ? bIdx.map(i => `<span class="manual-chip">${members[i].name}</span>`).join("")
+    ? bIdx.map(i => `<span class="manual-chip">${escapeHtml(members[i].name)}</span>`).join("")
     : `<span class="manual-chip-empty">없음</span>`;
 
   manualMemberListEl.innerHTML = [...selectedIndices].map(i => {
@@ -1127,7 +1127,7 @@ function renderManualSection() {
     return `
       <div class="manual-row" data-index="${i}">
         <div class="manual-row-info">
-          <span class="member-name">${m.studentId ? `${m.studentId} ` : ""}${m.name}</span>
+          <span class="member-name">${m.studentId ? `${escapeHtml(m.studentId)} ` : ""}${escapeHtml(m.name)}</span>
           ${tierBadgeHtml(m.tier)}
         </div>
         <div class="manual-assign-btns">
@@ -1235,7 +1235,7 @@ function renderSavedBoard() {
   savedBoardEl.classList.remove("hidden");
 
   const namesOf = team => team
-    .map(m => `${m.studentId ? m.studentId + " " : ""}${m.name}`)
+    .map(m => escapeHtml(`${m.studentId ? m.studentId + " " : ""}${m.name}`))
     .join(", ");
 
   savedBoardEl.innerHTML = `
@@ -1753,7 +1753,7 @@ function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, me
         ${unknownReserves.map(entry => `
           <div class="team-member-row">
             <span class="team-member-name">정보 없는 참가자</span>
-            <span class="team-member-riot">Discord ID ${entry.id}</span>
+            <span class="team-member-riot">Discord ID ${escapeHtml(entry.id)}</span>
           </div>
         `).join("")}
       </div>
