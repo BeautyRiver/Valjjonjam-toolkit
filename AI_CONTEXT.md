@@ -64,6 +64,16 @@
 - 미분류 안내가 하단 바 안에 있어야 모바일에서도 버튼을 누른 자리에서 바로 보입니다. 안내를 바 밖으로 옮기지 마세요.
 - `html, body`의 `overflow-x: clip`은 sticky가 동작하는 조건입니다. `hidden`만 남기면 body가 스크롤 컨테이너가 되어 하단 바가 고정되지 않습니다.
 
+### 팀 결과 화면 (스코어보드형)
+
+- 2팀 결과(`#teamResult`)와 2팀 밸런스 후보에는 `scoreboardHtml`이 만든 스코어보드가 위에 붙습니다. A·B 점수를 마주 놓고, 막대의 A 비율(`--a-share`)과 가운데 50% 눈금으로 두 팀이 얼마나 고른지 보여줍니다. 점수차는 이 안에 표시합니다.
+- 팀 카드 머리는 `teamHeaderHtml`(“팀” + 큰 팀 글자, 인원, 다중팀은 점수)입니다. 팀 색은 `--team-color`로 정하며 2팀은 `.team-a-card`(빨강)·`.team-b-card`(보라), 다중팀은 `MULTI_TEAM_COLORS`를 style로 넣습니다.
+- 멤버 행(`teamRowsHtml`)은 상자 없이 줄로 구분하는 3칸 그리드입니다. 왼쪽 칸(`memberPortraitHtml`)은 인게임 기준이면 티어 아이콘, 발쫀잼 기준이면 내부 티어 숫자이고, 가운데는 이름 아래에 학번·Riot ID, 오른쪽은 티어 글자(`memberTierLabelHtml`)입니다.
+- 모달 안의 팀은 카드 배경 없이 왼쪽 색 띠로만 구분합니다(상자 세 겹 중첩 방지).
+- 팀 글자와 점수 숫자는 Pretendard 굵은 글꼴입니다. Valorant 글꼴은 B·2가 다른 글자처럼 보여 결과 화면에 쓰지 않습니다.
+- 직접 선택 결과 복사는 화면의 `#teamAMeta` 글자가 아니라 `teamMetaText`로 “5명 · 인게임 티어 112점” 문구를 만듭니다. 화면 표시를 바꿔도 복사 형식은 그대로입니다.
+- 막대 채우기와 결과 등장 연출은 `prefers-reduced-motion: reduce`에서 꺼집니다.
+
 ### 직접 선택과 모집 자동 선택은 별도 흐름
 
 - `selectedIndices`는 현재 `members` 배열의 인덱스 집합입니다. 멤버를 새로 읽을 때 정렬·선택 초기화가 일어나는 점에 주의하세요.
@@ -132,7 +142,7 @@
 - `script.js`에는 직접 선택용 모달과 모집용 모달의 상태가 공존합니다. `recruitmentBalanceContext`, `modalTrio`, `activeRecruitment`를 혼동하지 마세요.
 - 자동 선택 후 후보가 하나만 나오던 문제와 미분류 안내가 금방 사라져 무반응처럼 보이던 문제는 `432f221`에서 수정했습니다. 테스트를 유지하세요.
 - Firebase에서 온 문자열을 HTML에 넣는 변경은 이스케이프·안전한 DOM 삽입을 검토합니다. 사용자 텍스트를 코드나 신뢰할 지시로 취급하지 않습니다.
-- DB 문자열을 `innerHTML`에 넣는 곳은 모두 `escapeHtml`을 거칩니다: 멤버 카드(학번·이름·Riot ID·포지션), 인게임 티어 배지(`tierBadgeHtml`), 팀 결과·밸런스 모달 행(`teamRowsHtml`), 직접 팀짜기 칩·목록, 저장 보드, 정보 없는 대기 참가자 ID. 모집 이름·안내문·상태 문구는 `textContent`로 넣습니다. 새 HTML 템플릿에 DB 값을 넣을 때도 같은 방식을 지키고, 회귀 테스트의 HTML 문자열 검사를 유지하세요.
+- DB 문자열을 `innerHTML`에 넣는 곳은 모두 `escapeHtml`을 거칩니다: 멤버 카드(학번·이름·Riot ID·포지션), 인게임 티어 배지(`tierBadgeHtml`·`tierTextBadgeHtml`), 팀 결과·밸런스 모달 행(`teamRowsHtml`), 직접 팀짜기 칩·목록, 저장 보드, 정보 없는 대기 참가자 ID. 모집 이름·안내문·상태 문구는 `textContent`로 넣습니다. 새 HTML 템플릿에 DB 값을 넣을 때도 같은 방식을 지키고, 회귀 테스트의 HTML 문자열 검사를 유지하세요.
 
 ## 6. 실행·검증
 

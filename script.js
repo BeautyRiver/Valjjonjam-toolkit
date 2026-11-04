@@ -419,7 +419,11 @@ function tierIcon(tier) {
 function tierBadgeHtml(tier) {
   const icon = tierIcon(tier);
   const img = icon ? `<img class="tier-icon" src="${icon}" alt="">` : "";
-  return `${img}<span class="tier-badge ${getTierClass(tier)}">${escapeHtml(normalizeTier(tier))}</span>`;
+  return `${img}${tierTextBadgeHtml(tier)}`;
+}
+
+function tierTextBadgeHtml(tier) {
+  return `<span class="tier-badge ${getTierClass(tier)}">${escapeHtml(normalizeTier(tier))}</span>`;
 }
 
 const DEFAULT_MAX_SELECT = 10;
@@ -449,6 +453,7 @@ const savedBoardEl    = document.getElementById("savedBoard");
 const teamResultEl    = document.getElementById("teamResult");
 const teamAListEl    = document.getElementById("teamAList");
 const teamBListEl    = document.getElementById("teamBList");
+const teamScoreboardEl = document.getElementById("teamScoreboard");
 const teamAMetaEl    = document.getElementById("teamAMeta");
 const teamBMetaEl    = document.getElementById("teamBMeta");
 const copyResultBtn  = document.getElementById("copyResultBtn");
@@ -638,44 +643,92 @@ function teamScore(team, scoreMode = activeScoreMode) {
   return team.reduce((s, m) => s + memberScore(m, scoreMode), 0);
 }
 
-// 팀 멤버 행들의 HTML (재사용: 결과 화면 + 모달)
+// 결과 행 왼쪽 칸: 인게임 기준은 티어 아이콘, 발쫀잼 기준은 내부 티어 숫자
+function memberPortraitHtml(m, scoreMode = activeScoreMode) {
+  if (scoreMode === SCORE_MODE_INTERNAL) {
+    const info = INTERNAL_TIER_INFO[m.internalTier];
+    return info
+      ? `<span class="team-member-portrait portrait-level internal-tier-${info.level}">${info.level}</span>`
+      : `<span class="team-member-portrait portrait-level internal-tier-unknown">?</span>`;
+  }
+  const icon = tierIcon(m.tier);
+  return `<span class="team-member-portrait">${icon ? `<img class="tier-icon" src="${icon}" alt="">` : ""}</span>`;
+}
+
+// 결과 행 오른쪽 티어 글자 (아이콘은 왼쪽 칸에 있으므로 글자만)
+function memberTierLabelHtml(m, scoreMode = activeScoreMode) {
+  return scoreMode === SCORE_MODE_INTERNAL
+    ? internalTierBadgeHtml(m.internalTier)
+    : tierTextBadgeHtml(m.tier);
+}
+
+// 팀 멤버 행들의 HTML (재사용: 결과 화면 + 모달 + 대기 명단)
 function teamRowsHtml(team, scoreMode = activeScoreMode) {
   return team.map(m => {
-    const namePrefix = m.studentId ? `${escapeHtml(m.studentId)} ` : "";
+    const sid = m.studentId ? `<span class="team-member-sid">${escapeHtml(m.studentId)}</span>` : "";
     const riot = m.riotId ? `<span class="team-member-riot">${escapeHtml(m.riotId)}</span>` : "";
+    const sub = sid || riot ? `<span class="team-member-sub">${sid}${riot}</span>` : "";
     return `
     <div class="team-member-row">
+      ${memberPortraitHtml(m, scoreMode)}
       <div class="team-member-info">
-        <span class="team-member-name">${namePrefix}${escapeHtml(m.name)}</span>
-        ${riot}
+        <span class="team-member-name">${escapeHtml(m.name)}</span>
+        ${sub}
       </div>
-      <span class="team-member-tier">${memberTierBadgeHtml(m, scoreMode)}</span>
+      <span class="team-member-tier">${memberTierLabelHtml(m, scoreMode)}</span>
     </div>
   `;
   }).join("");
 }
 
+// 팀 카드 머리: "팀" + 큰 팀 글자, 오른쪽에 인원(과 점수)
+function teamHeaderHtml(letter, team, scoreMode, showScore) {
+  const score = showScore
+    ? `<span class="team-score"><span class="team-score-num">${teamScore(team, scoreMode)}</span>점</span>`
+    : "";
+  return `
+    <div class="team-header">
+      <span class="team-label"><span class="team-word">팀</span><span class="team-letter">${letter}</span></span>
+      <span class="team-header-side">${score}<span class="team-meta">${team.length}명</span></span>
+    </div>
+  `;
+}
+
+// 두 팀 점수를 마주 보게 놓고, 막대의 갈림점으로 얼마나 고른지 보여줌
+function scoreboardHtml(sA, sB, scoreMode, withBasis = false) {
+  const total = sA + sB;
+  const share = total > 0 ? (sA / total) * 100 : 50;
+  const basis = withBasis ? `<span class="sb-basis">${scoreModeLabel(scoreMode)} 기준</span>` : "";
+  return `
+    <div class="scoreboard" style="--a-share:${share.toFixed(2)}%">
+      <span class="sb-side sb-a"><span class="sb-letter">A</span><span class="sb-score">${sA}</span></span>
+      <span class="sb-center">
+        <span class="sb-bar" aria-hidden="true"><span class="sb-fill sb-fill-a"></span><span class="sb-fill sb-fill-b"></span></span>
+        <span class="sb-caption"><span class="sb-diff">점수차 ${Math.abs(sA - sB)}</span>${basis}</span>
+      </span>
+      <span class="sb-side sb-b"><span class="sb-score">${sB}</span><span class="sb-letter">B</span></span>
+    </div>
+  `;
+}
+
 // 팀 A/B 풀 상세 그리드 HTML (결과 화면과 동일한 모양)
 function teamGridHtml(teamA, teamB, scoreMode = activeScoreMode) {
-  const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
   return `
     <div class="team-result-grid">
-      <div class="team-card card">
-        <div class="team-header">
-          <span class="team-label team-a-color">팀 A</span>
-          <span class="team-meta">${teamA.length}명 · 점수 ${sA}</span>
-        </div>
+      <div class="team-card card team-a-card">
+        ${teamHeaderHtml("A", teamA, scoreMode, false)}
         <div class="team-member-list">${teamRowsHtml(teamA, scoreMode)}</div>
       </div>
-      <div class="team-card card">
-        <div class="team-header">
-          <span class="team-label team-b-color">팀 B</span>
-          <span class="team-meta">${teamB.length}명 · 점수 ${sB}</span>
-        </div>
+      <div class="team-card card team-b-card">
+        ${teamHeaderHtml("B", teamB, scoreMode, false)}
         <div class="team-member-list">${teamRowsHtml(teamB, scoreMode)}</div>
       </div>
     </div>
   `;
+}
+
+function teamMetaText(team, scoreMode) {
+  return `${team.length}명 · ${scoreModeLabel(scoreMode)} ${teamScore(team, scoreMode)}점`;
 }
 
 function renderTeamList(container, team, scoreMode = activeScoreMode) {
@@ -696,8 +749,9 @@ function displayTeams(teamA, teamB, scoreMode = activeScoreMode) {
   teamB = sortByTier(teamB, scoreMode);
   lastTeams = { teamA, teamB, scoreMode };
   const sA = teamScore(teamA, scoreMode), sB = teamScore(teamB, scoreMode);
-  teamAMetaEl.textContent = `${teamA.length}명 · ${scoreModeLabel(scoreMode)} ${sA}점`;
-  teamBMetaEl.textContent = `${teamB.length}명 · ${scoreModeLabel(scoreMode)} ${sB}점`;
+  teamScoreboardEl.innerHTML = scoreboardHtml(sA, sB, scoreMode, true);
+  teamAMetaEl.textContent = `${teamA.length}명`;
+  teamBMetaEl.textContent = `${teamB.length}명`;
   renderTeamList(teamAListEl, teamA, scoreMode);
   renderTeamList(teamBListEl, teamB, scoreMode);
   teamResultEl.classList.remove("hidden");
@@ -911,8 +965,8 @@ function renderModalTrio() {
       <div class="modal-option" style="animation-delay:${idx * 0.08}s" data-opt="${idx}">
         <div class="opt-head">
           <span class="opt-title">옵션 ${idx + 1}</span>
-          <span class="opt-diff">점수차 ${c.diff}</span>
         </div>
+        ${scoreboardHtml(teamScore(teamA), teamScore(teamB), activeScoreMode)}
         ${teamGridHtml(teamA, teamB)}
         <button class="primary-btn opt-save" data-opt="${idx}">이 구성 저장</button>
       </div>
@@ -1173,7 +1227,8 @@ copyResultBtn.addEventListener("click", () => {
   const aRows = lastTeams.teamA.map(m => memberLine(m, lastTeams.scoreMode));
   const bRows = lastTeams.teamB.map(m => memberLine(m, lastTeams.scoreMode));
 
-  const text = `[${scoreModeLabel(lastTeams.scoreMode)} 기준]\n팀 A (${teamAMetaEl.textContent})\n${aRows.join("\n")}\n\n팀 B (${teamBMetaEl.textContent})\n${bRows.join("\n")}`;
+  const { teamA, teamB, scoreMode } = lastTeams;
+  const text = `[${scoreModeLabel(scoreMode)} 기준]\n팀 A (${teamMetaText(teamA, scoreMode)})\n${aRows.join("\n")}\n\n팀 B (${teamMetaText(teamB, scoreMode)})\n${bRows.join("\n")}`;
 
   copyTextToClipboard(text).then(() => {
     copyResultBtn.textContent = "✅ 복사됨!";
@@ -1667,13 +1722,9 @@ function multiTeamLabel(index) {
 function multiTeamGridHtml(teams, scoreMode) {
   return teams.map((team, index) => {
     const color = MULTI_TEAM_COLORS[index % MULTI_TEAM_COLORS.length];
-    const score = teamScore(team, scoreMode);
     return `
       <div class="team-card card multi-team-card" style="--team-color:${color}">
-        <div class="team-header">
-          <span class="team-label">팀 ${multiTeamLabel(index)}</span>
-          <span class="team-meta">${team.length}명 · ${scoreModeLabel(scoreMode)} ${score}점</span>
-        </div>
+        ${teamHeaderHtml(multiTeamLabel(index), team, scoreMode, true)}
         <div class="team-member-list">${teamRowsHtml(team, scoreMode)}</div>
       </div>
     `;
@@ -1752,8 +1803,11 @@ function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, me
         ${teamRowsHtml(knownReserves, scoreMode)}
         ${unknownReserves.map(entry => `
           <div class="team-member-row">
-            <span class="team-member-name">정보 없는 참가자</span>
-            <span class="team-member-riot">Discord ID ${escapeHtml(entry.id)}</span>
+            <span class="team-member-portrait portrait-level internal-tier-unknown">?</span>
+            <div class="team-member-info">
+              <span class="team-member-name">정보 없는 참가자</span>
+              <span class="team-member-sub"><span class="team-member-riot">Discord ID ${escapeHtml(entry.id)}</span></span>
+            </div>
           </div>
         `).join("")}
       </div>

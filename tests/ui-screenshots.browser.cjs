@@ -88,7 +88,13 @@ async function run() {
       await page.waitForSelector("#balanceModal.open");
       await page.waitForTimeout(500);
       await shot(page, `${prefix}-modal-2teams.png`);
+      await page.locator("#balanceModalList .opt-save").first().click();
       await page.click("#balanceModalClose");
+      await page.click("#savedBoard .saved-load");
+      await page.waitForSelector("#teamResult:not(.hidden)");
+      await page.locator("#teamResult").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));
+      await page.waitForTimeout(900);
+      await shot(page, `${prefix}-team-result.png`);
 
       await page.selectOption("#recruitmentSelect", "event_screens");
       await page.click("#selectRecruitmentMembersBtn");

@@ -625,14 +625,6 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-.multi-team-card {
-  border-top: 3px solid var(--team-color, #ff4655);
-}
-
-.multi-team-card .team-label {
-  color: var(--team-color, #ff4655);
-}
-
 .recruitment-reserves {
   margin-top: 14px;
   padding: 14px 16px;
@@ -1142,30 +1134,73 @@ button:disabled {
   gap: 16px;
 }
 
+/* 팀 색: 2팀은 A 빨강·B 보라, 다중팀은 JS가 style로 --team-color 지정 */
 .team-card {
-  padding: 22px;
+  --team-color: var(--accent);
+  padding: 18px 22px 10px;
+  border-top: 3px solid var(--team-color);
+  border-radius: 20px;
 }
+
+.team-a-card { --team-color: #ff4655; }
+.team-b-card { --team-color: #7c5cff; }
 
 .team-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding-bottom: 14px;
+  gap: 12px;
+  padding-bottom: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .team-label {
-  font-size: 1.5rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--team-color);
+  line-height: 1;
+}
+
+.team-word {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* Valorant 글꼴은 B·2가 다른 글자처럼 보여 팀 글자·점수에는 Pretendard 굵은 숫자를 씀 */
+.team-letter {
+  font-size: 1.8rem;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+}
+
+.team-header-side {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  line-height: 1;
+}
+
+.team-score {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.team-score-num {
+  margin-right: 2px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
 
 .team-a-color { color: #ff4655; }
 .team-b-color { color: #7c5cff; }
 
 .team-meta {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--muted);
   font-weight: 600;
 }
@@ -1173,17 +1208,157 @@ button:disabled {
 .team-member-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
+/* 스코어보드처럼 상자 없이 줄로 구분: 티어 칸 | 이름·학번·Riot ID | 티어 글자 */
 .team-member-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
+  gap: 12px;
+  padding: 10px 2px;
+}
+
+.team-member-row + .team-member-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.team-member-portrait {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.team-member-portrait:not(.portrait-level) {
+  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--team-color, #aeb8d0) 13%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.team-member-portrait .tier-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.portrait-level {
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+/* ===== 2팀 스코어보드: 두 팀 점수를 마주 놓고 막대 갈림점으로 고른 정도 표시 ===== */
+.team-scoreboard {
+  padding: 18px 24px;
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  background: rgba(10, 13, 22, 0.62);
+}
+
+.team-scoreboard:empty {
+  display: none;
+}
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+}
+
+.sb-side {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  line-height: 1;
+}
+
+.sb-letter {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.sb-score {
+  font-size: 2.5rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.sb-a .sb-score { color: #ff4655; }
+.sb-b .sb-score { color: #7c5cff; }
+
+.sb-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sb-bar {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 8px;
+}
+
+/* 가운데 50% 눈금: 갈림점이 눈금에 가까울수록 두 팀이 고름 */
+.sb-bar::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: rgba(244, 247, 255, 0.85);
+}
+
+.sb-fill {
+  height: 100%;
+  animation: sbGrow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sb-fill-a {
+  width: var(--a-share, 50%);
+  border-radius: 999px 0 0 999px;
+  background: #ff4655;
+  transform-origin: right center;
+}
+
+.sb-fill-b {
+  flex: 1;
+  border-radius: 0 999px 999px 0;
+  background: #7c5cff;
+  transform-origin: left center;
+}
+
+@keyframes sbGrow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.sb-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: 10px;
+  font-size: 0.82rem;
+}
+
+.sb-diff {
+  color: #ffd166;
+  font-weight: 800;
+}
+
+.sb-basis {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 /* ===== 결과 버튼 행 ===== */
@@ -1380,14 +1555,54 @@ button:disabled {
   transition: border-color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease;
 }
 
-/* 모달 안에서는 A/B를 위아래로(1열), 카드 패딩도 컴팩트하게 */
+/* 모달 안에서는 A/B를 위아래로(1열). 상자를 겹치지 않도록 팀은 왼쪽 색 띠로만 구분 */
 .modal-option .team-result-grid {
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 18px;
 }
 
 .modal-option .team-card {
-  padding: 14px;
+  padding: 2px 0 0 14px;
+  border: 0;
+  border-left: 3px solid var(--team-color);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.modal-option .team-header {
+  padding-bottom: 8px;
+}
+
+.modal-option .team-letter {
+  font-size: 1.6rem;
+}
+
+.modal-option .team-member-row {
+  padding: 8px 0;
+}
+
+.modal-option .scoreboard {
+  gap: 14px;
+  padding: 2px 2px 4px;
+}
+
+.modal-option .sb-score {
+  font-size: 1.8rem;
+}
+
+.opt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.opt-title {
+  font-weight: 800;
+  font-size: 0.95rem;
 }
 
 .modal-empty {
@@ -1558,24 +1773,37 @@ button:disabled {
 .team-member-info {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
 .team-member-name {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
 
-.team-member-riot {
-  font-size: 0.72rem;
+.team-member-sub {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  min-width: 0;
+  font-size: 0.74rem;
   color: var(--muted);
+}
+
+.team-member-sid {
+  font-variant-numeric: tabular-nums;
+}
+
+.team-member-riot {
+  min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
+  opacity: 0.8;
 }
 
 .team-member-tier {
@@ -1650,6 +1878,39 @@ button:disabled {
 
   .team-result-grid {
     grid-template-columns: 1fr;
+  }
+
+  .team-card {
+    padding: 16px 16px 8px;
+  }
+
+  .team-scoreboard {
+    padding: 16px;
+  }
+
+  .scoreboard {
+    gap: 12px;
+  }
+
+  .sb-score {
+    font-size: 2rem;
+  }
+
+  .modal-option .sb-score {
+    font-size: 1.6rem;
+  }
+
+  /* 좁은 화면에서 모달·옵션·팀 띠의 들여쓰기가 겹쳐 이름 칸이 좁아지지 않도록 */
+  .modal-box {
+    padding: 16px 14px;
+  }
+
+  .modal-option {
+    padding: 12px;
+  }
+
+  .modal-option .team-card {
+    padding-left: 10px;
   }
 
   /* 멤버 목록을 끝까지 내리지 않아도 선택 인원과 편성 버튼이 보이도록 하단 고정 */
@@ -1997,4 +2258,13 @@ button:disabled {
   justify-content: center;
   height: 100%;
   background: none;
+}
+
+/* 움직임 줄이기 설정을 켠 사용자에게는 결과 등장·막대 채우기 연출을 끔 */
+@media (prefers-reduced-motion: reduce) {
+  .sb-fill,
+  .team-result,
+  .modal-option {
+    animation: none;
+  }
 }
