@@ -55,6 +55,8 @@ async function run() {
   fs.mkdirSync(outDir, { recursive: true });
   const browser = await chromium.launch({
     headless: true,
+    // GPU가 없는 헤드리스에서도 공/수 결투 3D(WebGL)를 그리도록 소프트웨어 렌더러 허용
+    args: ["--enable-unsafe-swiftshader", "--use-angle=swiftshader"],
     ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {})
   });
   const errors = [];
@@ -95,6 +97,9 @@ async function run() {
       await page.locator("#teamResult").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));
       await page.waitForTimeout(900);
       await shot(page, `${prefix}-team-result.png`);
+      // 결과 버튼 줄과 그 아래 단독 🤠 공/수 정하기 버튼
+      await page.locator("#duelBtn").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + 24));
+      await shot(page, `${prefix}-team-result-actions.png`);
       // 팀 편집: 한 번 맞바꾼 뒤 다음 사람을 고른 상태
       await page.click("#editTeamsBtn");
       await page.locator("#teamAList .team-member-row").nth(0).click();
@@ -103,6 +108,19 @@ async function run() {
       await page.locator("#teamResult").evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 12));
       await shot(page, `${prefix}-team-edit.png`);
       await page.click("#editTeamsBtn");
+      // 공/수 결투: 첫 전경, 얼굴 클로즈업, 결과 (3D 라이브러리는 jsDelivr에서 받음, 못 받으면 대체 화면이 찍힘)
+      await page.click("#duelBtn");
+      await page.waitForSelector("#duelOverlay.open");
+      await page.waitForSelector("#duelStage canvas", { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+      await shot(page, `${prefix}-duel.png`);
+      await page.waitForTimeout(2800);
+      await shot(page, `${prefix}-duel-closeup.png`);
+      await page.waitForSelector("#duelResult:not([hidden])", { timeout: 20000 });
+      await page.waitForTimeout(400);
+      await shot(page, `${prefix}-duel-result.png`);
+      await page.click("#duelPickDefenseBtn");   // 이긴 팀이 공/수를 골라야 확인 버튼이 나옴
+      await page.click("#duelDoneBtn");
       await page.click("#manualTeamBtn");
       const manualRows = page.locator(".manual-row");
       for (let i = 0; i < 7; i++) await manualRows.nth(i).locator(`[data-team="${i % 2 ? "B" : "A"}"]`).click();

@@ -53,7 +53,7 @@ async function run() {
       if (file === "config.js") return route.fulfill({
         contentType: "text/javascript", body: 'const firebaseConfig={apiKey:"test",appId:"test"};'
       });
-      if (["index.html", "style.css", "script.js"].includes(file)) return route.fulfill({
+      if (["index.html", "style.css", "script.js", "duel.js"].includes(file)) return route.fulfill({
         contentType: file.endsWith(".js") ? "text/javascript" : file.endsWith(".css") ? "text/css" : "text/html",
         body: fs.readFileSync(path.join(root, file))
       });
@@ -336,6 +336,115 @@ async function run() {
     await page.click("#exitRecruitmentModeBtn");
     await assertNoInjectedHtml("team edit rows");
     console.log("PASS: team edit swap, undo, keyboard and save in 2-team and 4-team results, deal animation on reroll (also with reduced motion)");
+
+    // 공/수 결투: 이 테스트는 외부 요청을 막으므로 3D 라이브러리를 못 불러와 대체 화면(결과만 표시)으로 동작
+    for (let i = 0; i < 10; i++) await page.locator(`.member-card[data-index="${i}"]`).click();
+    await page.click("#randomTeamBtn");
+    await page.click("#duelBtn");
+    await page.waitForSelector("#duelOverlay.open");
+    await page.waitForSelector("#duelResult:not([hidden])", { timeout: 12000 });
+    assert.equal(await page.locator("#duelFallbackNote").isVisible(), true, "fallback without the 3D library");
+    // 복사 문구: 공/수 줄은 없고 팀 줄 끝에 [공격]/[수비] (고르기 전엔 이긴 팀만 [결투 승리])
+    const copyHeadings = text => {
+      assert.ok(!text.includes("공/수 결투"), "no separate duel line in the copy text");
+      return text.split("\n").filter(line => /^팀 [A-Z] \(/.test(line));
+    };
+    const tagOf = line => (line.match(/\) \[(.+)\]$/) || [])[1] || "";
+    assert.equal(await page.evaluate(() => document.querySelector("#duelBtn").previousElementSibling.classList.contains("result-actions")), true,
+      "duel button sits alone below the result buttons");
+    const duelState = () => page.evaluate(() => ({
+      winner: lastTeams.sides?.winner,
+      defense: lastTeams.sides?.defense,
+      teams: [lastTeams.teamA.map(m => m.name), lastTeams.teamB.map(m => m.name)],
+      winnerTeam: document.querySelector("#duelWinnerTeam").textContent,
+      winnerName: document.querySelector("#duelWinnerName").textContent,
+      badges: [document.querySelector("#teamASide"), document.querySelector("#teamBSide")].map(el => el.hidden ? "" : el.textContent)
+    }));
+    // 결투가 끝나면 가운데에 "팀 B 승 / 이름 승리!", 공/수는 아직 안 정해짐(이긴 팀이 고름)
+    const duel = await duelState();
+    assert.ok([0, 1].includes(duel.winner));
+    assert.equal(duel.defense, null);
+    assert.equal(await page.locator("#duelWinner").isVisible(), true, "big winner banner");
+    const winnerLetter = duel.winner === 0 ? "A" : "B";
+    assert.equal(duel.winnerTeam, `팀 ${winnerLetter} 승`);
+    assert.ok(duel.teams[duel.winner].some(name => duel.winnerName === `${name} 승리!`), "winner name comes from the winning team");
+    assert.equal(duel.badges[duel.winner], "🏆 결투 승리 · 공/수 선택 전");
+    assert.equal(duel.badges[1 - duel.winner], "");
+    const beforeHeadings = copyHeadings(await page.evaluate(() => buildTeamResultText()));
+    assert.equal(tagOf(beforeHeadings[duel.winner]), "결투 승리");
+    assert.equal(tagOf(beforeHeadings[1 - duel.winner]), "");
+    // 이긴 팀이 수비를 고르면 이긴 팀 수비, 진 팀 공격
+    await page.click("#duelPickDefenseBtn");
+    const chosen = await duelState();
+    assert.equal(chosen.defense, duel.winner, "winner picked defense");
+    assert.equal(chosen.badges[duel.winner], "🛡️ 수비 시작");
+    assert.equal(chosen.badges[1 - duel.winner], "⚔️ 공격 시작");
+    const chosenHeadings = copyHeadings(await page.evaluate(() => buildTeamResultText()));
+    assert.match(chosenHeadings[duel.winner], new RegExp(`^팀 ${winnerLetter} \\(\\d+명 · \\d+점\\) \\[수비\\]$`));
+    assert.equal(tagOf(chosenHeadings[1 - duel.winner]), "공격");
+    assert.equal(await page.locator("#duelDoneBtn").isVisible(), true);
+    await page.keyboard.press("Escape");
+    assert.equal(await page.locator("#duelOverlay").evaluate(el => el.classList.contains("open")), false);
+    assert.equal(await page.evaluate(() => document.activeElement.id), "duelBtn", "focus returns to the duel button");
+    // 팀 편집으로 맞바꿔도 공/수는 그대로
+    await page.click("#editTeamsBtn");
+    await page.locator("#teamAList .team-member-row").first().click();
+    await page.locator("#teamBList .team-member-row").first().click();
+    assert.equal(await page.evaluate(() => lastTeams.sides?.defense), duel.winner, "sides kept after a team edit swap");
+    await page.click("#editTeamsBtn");
+    // 건너뛰기(키보드 S)는 바로 결과, 이긴 팀이 공격을 고르면 진 팀이 수비
+    await page.click("#duelBtn");
+    await page.waitForSelector("#duelOverlay.open");
+    await page.keyboard.press("s");
+    assert.equal(await page.locator("#duelResult").isVisible(), true, "S key skips to the result right away");
+    assert.equal(await page.locator("#duelSkipBtn").isVisible(), false);
+    await page.click("#duelPickAttackBtn");
+    const attackPick = await duelState();
+    assert.equal(attackPick.defense, 1 - attackPick.winner, "winner picked attack");
+    // 다시 결투는 새 결과, 고르지 않고 닫으면 이긴 팀만 기록
+    await page.click("#duelAgainBtn");
+    assert.equal(await page.locator("#duelResult").isVisible(), false);
+    await page.waitForSelector("#duelResult:not([hidden])", { timeout: 12000 });
+    await page.click("#duelCloseBtn");
+    const unchosen = await duelState();
+    assert.equal(unchosen.defense, null, "closing before choosing keeps only the winner");
+    assert.equal(unchosen.badges[unchosen.winner], "🏆 결투 승리 · 공/수 선택 전");
+    // 새로 편성하면 공/수 표시는 사라짐
+    await page.click("#randomTeamBtn");
+    assert.equal(await page.locator("#teamASide").isVisible(), false);
+
+    // 모집 결과: 2팀이면 결투 버튼이 보이고 결과가 모집 결과·복사 문구에 붙음, 3팀 이상이면 버튼 없음
+    // (앞 단계에서 group10 명단을 15명으로 늘렸다 되돌렸으므로 모집 목록을 다시 불러와 10명 기준으로 맞춤)
+    await page.click("#reloadRecruitmentsBtn");
+    await page.waitForFunction(() => !document.querySelector("#reloadRecruitmentsBtn").disabled);
+    await page.selectOption("#recruitmentSelect", "group10");
+    await page.click("#selectRecruitmentMembersBtn");
+    await page.click("#randomTeamBtn");
+    assert.equal(await page.locator("#recruitmentTeamGrid .team-card").count(), 2);
+    assert.equal(await page.locator("#recruitmentDuelBtn").isVisible(), true);
+    await page.click("#recruitmentDuelBtn");
+    await page.click("#duelSkipBtn");
+    await page.click("#duelPickDefenseBtn");
+    await page.click("#duelDoneBtn");
+    const recruitSides = await page.evaluate(() => lastRecruitmentResult.sides);
+    assert.ok([0, 1].includes(recruitSides.winner));
+    assert.equal(recruitSides.defense, recruitSides.winner);
+    assert.equal(await page.locator('#recruitmentTeamGrid .team-side-badge.side-defense').count(), 1);
+    const recruitLetter = recruitSides.winner === 0 ? "A" : "B";
+    const recruitHeadings = copyHeadings(await page.evaluate(() => buildRecruitmentResultText()));
+    assert.equal(recruitHeadings.length, 2);
+    assert.ok(recruitHeadings[recruitSides.winner].startsWith(`팀 ${recruitLetter} (`));
+    assert.equal(tagOf(recruitHeadings[recruitSides.winner]), "수비");
+    assert.equal(tagOf(recruitHeadings[1 - recruitSides.winner]), "공격");
+    assert.equal(await page.evaluate(() => document.querySelector("#recruitmentDuelBtn").previousElementSibling.classList.contains("result-actions")), true);
+    await page.click("#exitRecruitmentModeBtn");
+    await page.selectOption("#recruitmentSelect", "group20");
+    await page.click("#selectRecruitmentMembersBtn");
+    await page.click("#randomTeamBtn");
+    assert.equal(await page.locator("#recruitmentDuelBtn").isVisible(), false, "no duel for 4 teams");
+    await page.click("#exitRecruitmentModeBtn");
+    await assertNoInjectedHtml("duel result and badges");
+    console.log("PASS: duel winner banner, winner picks attack/defense (direct and recruitment), [공격]/[수비] copy headings, standalone button, close before choosing, fallback, skip, again, Esc, kept after team edit, hidden for 4 teams");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.selectOption("#recruitmentSelect", "group20");

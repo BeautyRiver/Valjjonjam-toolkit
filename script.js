@@ -532,6 +532,8 @@ const teamResultEl    = document.getElementById("teamResult");
 const teamAListEl    = document.getElementById("teamAList");
 const teamBListEl    = document.getElementById("teamBList");
 const teamScoreboardEl = document.getElementById("teamScoreboard");
+const teamASideEl    = document.getElementById("teamASide");
+const teamBSideEl    = document.getElementById("teamBSide");
 const teamAMetaEl    = document.getElementById("teamAMeta");
 const teamBMetaEl    = document.getElementById("teamBMeta");
 const copyResultBtn  = document.getElementById("copyResultBtn");
@@ -797,15 +799,35 @@ function teamBasisText(scoreMode, method, edited = false) {
   return `${teamMethodLabel(method, edited)} · ${scoreModeLabel(scoreMode)} 기준`;
 }
 
-// 팀 카드 머리: "팀" + 큰 팀 글자, 오른쪽에 인원(과 점수)
-function teamHeaderHtml(letter, team, scoreMode, showScore) {
+// 공/수 결투 결과 표시: 결투로 이긴 팀을 정하고, 공격·수비는 이긴 팀이 고름
+// sides = { winner: 결투에서 이긴 팀 번호, defense: 수비로 시작하는 팀 번호 또는 null(이긴 팀이 아직 안 고름) }
+const SIDE_LABELS = { defense: "🛡️ 수비 시작", attack: "⚔️ 공격 시작", winner: "🏆 결투 승리 · 공/수 선택 전" };
+
+function teamSideOf(sides, teamIndex) {
+  if (!sides) return null;
+  if (sides.defense === null || sides.defense === undefined) return sides.winner === teamIndex ? "winner" : null;
+  return sides.defense === teamIndex ? "defense" : "attack";
+}
+
+function sideBadgeHtml(side) {
+  return side ? `<span class="team-side-badge side-${side}">${SIDE_LABELS[side]}</span>` : "";
+}
+
+// 복사 문구의 팀 줄 끝에 붙는 공/수 표시: "수비"·"공격", 이긴 팀이 아직 안 골랐으면 이긴 팀에만 "결투 승리"
+function teamSideCopyTag(sides, teamIndex) {
+  const side = teamSideOf(sides, teamIndex);
+  return { defense: "수비", attack: "공격", winner: "결투 승리" }[side] || "";
+}
+
+// 팀 카드 머리: "팀" + 큰 팀 글자, 오른쪽에 공/수 표시·인원(과 점수)
+function teamHeaderHtml(letter, team, scoreMode, showScore, side = null) {
   const score = showScore
     ? `<span class="team-score"><span class="team-score-num">${teamScore(team, scoreMode)}</span>점</span>`
     : "";
   return `
     <div class="team-header">
       <span class="team-label"><span class="team-word">팀</span><span class="team-letter">${letter}</span></span>
-      <span class="team-header-side">${score}<span class="team-meta">${team.length}명</span></span>
+      <span class="team-header-side">${sideBadgeHtml(side)}${score}<span class="team-meta">${team.length}명</span></span>
     </div>
   `;
 }
@@ -842,9 +864,9 @@ function teamGridHtml(teamA, teamB, scoreMode = activeScoreMode) {
   `;
 }
 
-// 복사 문구의 팀 줄: 2팀·다중팀 모두 "팀 A (5명 · 112점)"
-function teamCopyHeading(label, team, scoreMode) {
-  return `팀 ${label} (${team.length}명 · ${teamScore(team, scoreMode)}점)`;
+// 복사 문구의 팀 줄: 2팀·다중팀 모두 "팀 A (5명 · 112점)", 공/수가 정해졌으면 뒤에 " [공격]"·" [수비]"
+function teamCopyHeading(label, team, scoreMode, sideTag = "") {
+  return `팀 ${label} (${team.length}명 · ${teamScore(team, scoreMode)}점)${sideTag ? ` [${sideTag}]` : ""}`;
 }
 
 function renderTeamList(container, team, scoreMode = activeScoreMode) {
@@ -880,6 +902,12 @@ function renderDirectTeams() {
   teamScoreboardEl.innerHTML = scoreboardHtml(sA, sB, teamBasisText(scoreMode, method, edited));
   teamAMetaEl.textContent = `${teamA.length}명`;
   teamBMetaEl.textContent = `${teamB.length}명`;
+  [teamASideEl, teamBSideEl].forEach((el, index) => {
+    const side = teamSideOf(lastTeams.sides, index);
+    el.hidden = !side;
+    el.className = `team-side-badge${side ? ` side-${side}` : ""}`;
+    el.textContent = side ? SIDE_LABELS[side] : "";
+  });
   renderTeamList(teamAListEl, teamA, scoreMode);
   renderTeamList(teamBListEl, teamB, scoreMode);
   decorateEditRows("direct");
@@ -1424,15 +1452,15 @@ function memberLine(m, scoreMode) {
 
 // 직접 선택 결과 복사 문구 (모집 결과 복사와 같은 형식)
 function buildTeamResultText() {
-  const { teamA, teamB, scoreMode, method, edited } = lastTeams;
+  const { teamA, teamB, scoreMode, method, edited, sides } = lastTeams;
   const diff = Math.abs(teamScore(teamA, scoreMode) - teamScore(teamB, scoreMode));
   return [
     `[${teamBasisText(scoreMode, method, edited)} · 점수차 ${diff}점]`,
     "",
-    teamCopyHeading("A", teamA, scoreMode),
+    teamCopyHeading("A", teamA, scoreMode, teamSideCopyTag(sides, 0)),
     ...teamA.map(m => memberLine(m, scoreMode)),
     "",
-    teamCopyHeading("B", teamB, scoreMode),
+    teamCopyHeading("B", teamB, scoreMode, teamSideCopyTag(sides, 1)),
     ...teamB.map(m => memberLine(m, scoreMode))
   ].join("\n");
 }
@@ -1960,12 +1988,13 @@ function multiTeamLabel(index) {
   return label;
 }
 
-function multiTeamGridHtml(teams, scoreMode) {
+// sides: 모집 결과가 2팀이고 공/수 결투를 했을 때만 넘김 (후보 모달에서는 없음)
+function multiTeamGridHtml(teams, scoreMode, sides = null) {
   return teams.map((team, index) => {
     const color = MULTI_TEAM_COLORS[index % MULTI_TEAM_COLORS.length];
     return `
       <div class="team-card card multi-team-card" style="--team-color:${color}">
-        ${teamHeaderHtml(multiTeamLabel(index), team, scoreMode, true)}
+        ${teamHeaderHtml(multiTeamLabel(index), team, scoreMode, true, teamSideOf(sides, index))}
         <div class="team-member-list" data-team-index="${index}">${teamRowsHtml(team, scoreMode)}</div>
       </div>
     `;
@@ -2076,7 +2105,9 @@ function renderRecruitmentTeams() {
   recruitmentResultLabelEl.textContent = `${icon} ${teamBasisText(scoreMode, method, edited)}`;
   recruitmentResultTitleEl.textContent = `${recruitmentTypeLabel(recruitment)} · ${recruitment.name}`;
   recruitmentResultSummaryEl.textContent = `${teams.length}팀 · 최대 점수차 ${multiTeamMetric(teams, scoreMode).spread}점`;
-  recruitmentTeamGridEl.innerHTML = multiTeamGridHtml(teams, scoreMode);
+  recruitmentTeamGridEl.innerHTML = multiTeamGridHtml(teams, scoreMode, lastRecruitmentResult.sides);
+  // 공/수 결투는 맞붙는 두 팀이 정해진 2팀 결과에서만 (3팀 이상은 경기 짝이 정해져 있지 않음)
+  document.getElementById("recruitmentDuelBtn").hidden = teams.length !== 2;
   decorateEditRows("recruitment");
 }
 
@@ -2124,7 +2155,7 @@ function buildSelectedRecruitmentTeams(scoreMode, reroll = false, method = "bala
 
 function buildRecruitmentResultText() {
   if (!lastRecruitmentResult) return "";
-  const { recruitment, analysis, teams, scoreMode, method, edited } = lastRecruitmentResult;
+  const { recruitment, analysis, teams, scoreMode, method, edited, sides } = lastRecruitmentResult;
   const spread = multiTeamMetric(teams, scoreMode).spread;
   const lines = [
     `[${recruitmentTypeLabel(recruitment)} · ${recruitment.name}]`,
@@ -2132,7 +2163,7 @@ function buildRecruitmentResultText() {
   ];
 
   teams.forEach((team, index) => {
-    lines.push("", teamCopyHeading(multiTeamLabel(index), team, scoreMode));
+    lines.push("", teamCopyHeading(multiTeamLabel(index), team, scoreMode, teamSideCopyTag(sides, index)));
     lines.push(...team.map(member => memberLine(member, scoreMode)));
   });
 

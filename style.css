@@ -2361,3 +2361,467 @@ html.modal-open body {
     padding: 14px;
   }
 }
+
+/* ===== 공/수 결투 (duel.js) ===== */
+/* 팀 카드 머리의 공/수 표시: 수비는 청록, 공격은 주황 (팀 색 빨강·보라와 겹치지 않게) */
+.team-side-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.team-side-badge[hidden] {
+  display: none;
+}
+
+.team-side-badge.side-defense {
+  color: #5ee1d6;
+  background: rgba(94, 225, 214, 0.12);
+  border-color: rgba(94, 225, 214, 0.38);
+}
+
+.team-side-badge.side-attack {
+  color: #ffb35c;
+  background: rgba(255, 179, 92, 0.12);
+  border-color: rgba(255, 179, 92, 0.38);
+}
+
+.duel-overlay {
+  padding: 16px;
+  background: rgba(4, 5, 10, 0.82);
+}
+
+.duel-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(1000px, 100%);
+  max-height: calc(100vh - 32px);
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: #0b0d14;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.duel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.duel-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.duel-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.duel-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* 영화 화면처럼 가로 16:9, 휴대폰 세로 화면에서는 3:4 */
+.duel-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: calc(100vh - 110px);
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(#160d2a, #4b2457 45%, #f08a4b 85%, #a65f38 85%);
+}
+
+.duel-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 얼굴·눈·손 클로즈업 동안 영화처럼 위아래 검은 띠 (duel.js가 cinema 클래스를 붙였다 뗌) */
+.duel-stage::before,
+.duel-stage::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 0;
+  background: #000;
+  pointer-events: none;
+  transition: height 0.18s ease-out;
+}
+
+.duel-stage::before { top: 0; }
+.duel-stage::after { bottom: 0; }
+
+.duel-stage.cinema::before,
+.duel-stage.cinema::after {
+  height: 12%;
+}
+
+.duel-caption {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 2;
+  margin: 0;
+  color: #fff4e6;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.duel-caption[hidden],
+.duel-loading[hidden],
+.duel-skip[hidden],
+.duel-result[hidden],
+.duel-fallback[hidden] {
+  display: none;
+}
+
+.duel-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #fff4e6;
+  font-weight: 700;
+}
+
+.duel-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #fff7d6;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.duel-flash.show {
+  animation: duelFlash 0.35s ease-out;
+}
+
+@keyframes duelFlash {
+  from { opacity: 0.85; }
+  to   { opacity: 0; }
+}
+
+.duel-bang {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  z-index: 4;
+  color: #ffd166;
+  font-size: clamp(3rem, 12vw, 6.5rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-shadow: 0 4px 0 #8a2a1f, 0 0 26px rgba(255, 140, 60, 0.85);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  pointer-events: none;
+}
+
+.duel-bang.show {
+  animation: duelBang 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes duelBang {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-8deg); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(-4deg); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-4deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.05) rotate(-4deg); }
+}
+
+.duel-skip {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(10, 12, 20, 0.6);
+  color: #fff4e6;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.duel-result {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(460px, calc(100% - 24px));
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(10, 12, 20, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  animation: duelResultIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes duelResultIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.duel-fallback {
+  margin: 0;
+  color: #ffd166;
+  font-size: 0.82rem;
+}
+
+.duel-result-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+}
+
+.duel-side {
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.side-defense .duel-side { color: #5ee1d6; }
+.side-attack .duel-side { color: #ffb35c; }
+
+.duel-team {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.duel-note {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duel-result-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.duel-result-actions button {
+  flex: 1;
+  padding: 10px 12px;
+}
+
+@media (max-width: 640px) {
+  .duel-overlay {
+    padding: 10px;
+  }
+
+  .duel-box {
+    padding: 10px;
+  }
+
+  .duel-stage {
+    aspect-ratio: 3 / 4;
+  }
+}
+
+/* 공/수 결투: 이긴 팀 표시(공/수 선택 전) */
+.team-side-badge.side-winner {
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.12);
+  border-color: rgba(255, 209, 102, 0.4);
+}
+
+/* 결투가 끝나면 가운데에 크게: "팀 B 승" / "강승모 승리!" / 어떻게 이겼는지 */
+.duel-winner {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: calc(100% - 24px);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: duelWinnerIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.duel-winner[hidden] {
+  display: none;
+}
+
+@keyframes duelWinnerIn {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.duel-winner-team {
+  font-size: clamp(1.4rem, 4.5vw, 2.4rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 0, 0, 0.5);
+}
+
+.duel-winner-name {
+  color: #fff4e6;
+  font-size: clamp(2rem, 8vw, 4.2rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-shadow: 0 4px 0 #8a2a1f, 0 0 26px rgba(255, 140, 60, 0.75);
+}
+
+.duel-winner-how {
+  margin-top: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(10, 12, 20, 0.6);
+  color: #ffd166;
+  font-size: clamp(0.8rem, 2.4vw, 1rem);
+  font-weight: 800;
+}
+
+.duel-choose-prompt {
+  margin: 0;
+  color: #fff4e6;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.duel-choice,
+.duel-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.duel-choice[hidden],
+.duel-sides[hidden],
+.duel-result-actions button[hidden] {
+  display: none;
+}
+
+.duel-sides {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.duel-pick {
+  padding: 12px 10px;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.duel-pick.side-defense {
+  border-color: rgba(94, 225, 214, 0.5);
+  color: #5ee1d6;
+}
+
+.duel-pick.side-attack {
+  border-color: rgba(255, 179, 92, 0.5);
+  color: #ffb35c;
+}
+
+@media (max-width: 640px) {
+  .duel-winner {
+    top: 30%;
+  }
+}
+
+/* ===== 공/수 정하기 버튼: 결과 버튼 줄 아래 단독, 해 질 녘 색으로 강조 ===== */
+.duel-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 18px 20px;
+  color: #2a1204;
+  background: linear-gradient(120deg, #ffd166 0%, #ffb35c 45%, #ff7a45 100%);
+  border: 1px solid rgba(255, 224, 160, 0.7);
+  box-shadow: 0 12px 30px rgba(255, 140, 60, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  text-align: center;
+}
+
+.duel-cta[hidden] {
+  display: none;
+}
+
+.duel-cta-title {
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.duel-cta-sub {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: rgba(42, 18, 4, 0.72);
+}
+
+/* 전체 너비 버튼이라 공통 버튼의 1.04배 확대 대신 살짝만 */
+.duel-cta:not(:disabled):hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 18px 40px rgba(255, 140, 60, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  filter: brightness(1.05);
+}
+
+.duel-cta:focus-visible {
+  outline: 3px solid #fff3d1;
+  outline-offset: 3px;
+}
+
+@media (max-width: 768px) {
+  .duel-cta {
+    padding: 16px 14px;
+  }
+
+  .duel-cta-title {
+    font-size: 1.18rem;
+  }
+
+  .duel-cta-sub {
+    font-size: 0.8rem;
+  }
+}

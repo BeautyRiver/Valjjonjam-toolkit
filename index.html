@@ -209,6 +209,11 @@
                         <button id="editRecruitmentTeamsBtn" class="secondary-btn" aria-pressed="false">✏️ 팀 편집</button>
                         <button id="undoRecruitmentSwapBtn" class="secondary-btn" hidden disabled>↩️ 되돌리기</button>
                     </div>
+                    <!-- 공/수 결투: 버튼 줄 아래에 단독으로 크게 (2팀일 때만 보임) -->
+                    <button id="recruitmentDuelBtn" class="duel-cta" hidden>
+                        <span class="duel-cta-title">🤠 공/수 정하기</span>
+                        <span class="duel-cta-sub">두 팀 대표가 총싸움해서 이긴 팀이 공격·수비를 골라요</span>
+                    </button>
                 </div>
 
                 <!-- 직접 팀짜기 -->
@@ -234,14 +239,14 @@
                         <div class="team-card card team-a-card">
                             <div class="team-header">
                                 <span class="team-label"><span class="team-word">팀</span><span class="team-letter">A</span></span>
-                                <span class="team-header-side"><span id="teamAMeta" class="team-meta"></span></span>
+                                <span class="team-header-side"><span id="teamASide" class="team-side-badge" hidden></span><span id="teamAMeta" class="team-meta"></span></span>
                             </div>
                             <div id="teamAList" class="team-member-list" data-team-index="0"></div>
                         </div>
                         <div class="team-card card team-b-card">
                             <div class="team-header">
                                 <span class="team-label"><span class="team-word">팀</span><span class="team-letter">B</span></span>
-                                <span class="team-header-side"><span id="teamBMeta" class="team-meta"></span></span>
+                                <span class="team-header-side"><span id="teamBSide" class="team-side-badge" hidden></span><span id="teamBMeta" class="team-meta"></span></span>
                             </div>
                             <div id="teamBList" class="team-member-list" data-team-index="1"></div>
                         </div>
@@ -253,6 +258,11 @@
                         <button id="editTeamsBtn" class="secondary-btn" aria-pressed="false">✏️ 팀 편집</button>
                         <button id="undoTeamSwapBtn" class="secondary-btn" hidden disabled>↩️ 되돌리기</button>
                     </div>
+                    <!-- 공/수 결투: 버튼 줄 아래에 단독으로 크게 -->
+                    <button id="duelBtn" class="duel-cta">
+                        <span class="duel-cta-title">🤠 공/수 정하기</span>
+                        <span class="duel-cta-sub">두 팀 대표가 총싸움해서 이긴 팀이 공격·수비를 골라요</span>
+                    </button>
                 </div>
 
                 <!-- 저장 보드 -->
@@ -308,11 +318,60 @@
         </div>
     </div>
 
+    <!-- 공/수 결투: 두 팀에서 한 명씩 나와 서부극 총싸움, 살아남은 쪽 팀이 수비로 시작 (3D 장면은 duel.js가 그림) -->
+    <div id="duelOverlay" class="modal-overlay duel-overlay" aria-hidden="true">
+        <div class="duel-box" role="dialog" aria-modal="true" aria-label="공/수 결투" tabindex="-1">
+            <div class="duel-head">
+                <span class="duel-title">🤠 공/수 결투</span>
+                <div class="duel-head-actions">
+                    <button id="duelSoundBtn" class="duel-icon-btn" aria-pressed="true" aria-label="소리 끄기">🔊</button>
+                    <button id="duelCloseBtn" class="modal-close" aria-label="닫기">✕</button>
+                </div>
+            </div>
+            <div id="duelStage" class="duel-stage">
+                <p id="duelCaption" class="duel-caption">이긴 팀이 공격·수비를 고릅니다</p>
+                <p id="duelLoading" class="duel-loading" hidden>결투장 준비 중…</p>
+                <div id="duelFlash" class="duel-flash" aria-hidden="true"></div>
+                <span id="duelBang" class="duel-bang" aria-hidden="true">탕!</span>
+                <button id="duelSkipBtn" class="duel-skip" title="S·Enter·Space로도 건너뛸 수 있어요">건너뛰기 ▸▸</button>
+                <!-- 결투가 끝나면 가운데에 크게: "팀 B 승" / "강승모 승리!" / 어떻게 이겼는지 -->
+                <div id="duelWinner" class="duel-winner" hidden>
+                    <span id="duelWinnerTeam" class="duel-winner-team"></span>
+                    <strong id="duelWinnerName" class="duel-winner-name"></strong>
+                    <span id="duelWinnerHow" class="duel-winner-how"></span>
+                </div>
+                <div id="duelResult" class="duel-result" aria-live="polite" hidden>
+                    <p id="duelFallbackNote" class="duel-fallback" hidden>3D 화면을 불러오지 못해 결과만 보여드려요.</p>
+                    <p id="duelChoosePrompt" class="duel-choose-prompt"></p>
+                    <div id="duelChoice" class="duel-choice">
+                        <button id="duelPickAttackBtn" class="secondary-btn duel-pick side-attack">⚔️ 공격 시작</button>
+                        <button id="duelPickDefenseBtn" class="secondary-btn duel-pick side-defense">🛡️ 수비 시작</button>
+                    </div>
+                    <div id="duelSides" class="duel-sides" hidden>
+                        <div class="duel-result-row side-defense">
+                            <span class="duel-side">🛡️ 수비 시작</span>
+                            <strong id="duelDefenseTeam" class="duel-team"></strong>
+                        </div>
+                        <div class="duel-result-row side-attack">
+                            <span class="duel-side">⚔️ 공격 시작</span>
+                            <strong id="duelAttackTeam" class="duel-team"></strong>
+                        </div>
+                    </div>
+                    <div class="duel-result-actions">
+                        <button id="duelAgainBtn" class="secondary-btn">🔁 다시 결투</button>
+                        <button id="duelDoneBtn" class="primary-btn" hidden>확인</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase (compat 빌드: 전역 firebase 객체 제공) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="config.js"></script>
     <script src="script.js"></script>
+    <script src="duel.js"></script>
 </body>
 
 </html>

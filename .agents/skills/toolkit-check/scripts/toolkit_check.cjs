@@ -75,7 +75,8 @@ function changedFiles(base) {
 // ① 문법·공백
 function checkSyntax(base) {
   heading("① 문법·공백");
-  const files = ["script.js", "config.js", SELF,
+  // 저장소 루트의 모든 .js(script.js·duel.js·config.js 등)와 이 스크립트, tests/*.cjs
+  const files = [...fs.readdirSync(ROOT).filter(f => f.endsWith(".js")), SELF,
     ...fs.readdirSync(path.join(ROOT, "tests")).filter(f => f.endsWith(".cjs")).map(f => `tests/${f}`)];
   const failed = [];
   for (const file of files) {
