@@ -307,6 +307,12 @@
                 <span id="balanceModalTitle" class="modal-title">⚖️ 밸런스 후보 3가지</span>
                 <button id="balanceModalClose" class="modal-close" aria-label="닫기">✕</button>
             </div>
+            <!-- 후보 중 랜덤 뽑기: 옵션을 번갈아 비추다 하나에 멈춤 (뽑힌 후보는 누르는 순간 정해지고 화면만 연출) -->
+            <div class="spin-bar">
+                <button id="spinBalanceBtn" class="spin-btn">🎰 고민되면 랜덤 뽑기</button>
+                <div id="balanceSpinChips" class="spin-chips" aria-hidden="true"></div>
+                <p id="balanceSpinResult" class="spin-result" aria-live="polite"></p>
+            </div>
             <div id="balanceModalList" class="modal-options"></div>
             <div class="modal-foot">
                 <button id="rerollBalanceBtn" class="reroll-btn primary-btn">

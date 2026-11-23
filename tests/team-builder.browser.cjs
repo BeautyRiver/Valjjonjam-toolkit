@@ -446,6 +446,78 @@ async function run() {
     await assertNoInjectedHtml("duel result and badges");
     console.log("PASS: duel winner banner, winner picks attack/defense (direct and recruitment), [공격]/[수비] copy headings, standalone button, close before choosing, fallback, skip, again, Esc, kept after team edit, hidden for 4 teams");
 
+    // 후보 중 랜덤 뽑기: 누르는 순간 뽑힐 옵션이 정해지고(balanceSpinPick), 옵션을 번갈아 비추다 그 옵션에 멈춤
+    const spinState = () => page.evaluate(() => ({
+      pick: balanceSpinPick,
+      spinning: document.querySelector("#balanceModalList").classList.contains("is-spinning"),
+      picked: [...document.querySelectorAll("#balanceModalList .modal-option")].map(el => el.classList.contains("is-picked")),
+      badges: document.querySelectorAll("#balanceModalList .opt-picked-badge").length,
+      chips: [...document.querySelectorAll("#balanceSpinChips .spin-chip")].map(el => el.classList.contains("is-picked")),
+      text: document.querySelector("#balanceSpinResult").textContent,
+      focus: document.activeElement?.className || "",
+      focusOpt: document.activeElement?.dataset?.opt ?? null,
+      btnDisabled: document.querySelector("#spinBalanceBtn").disabled
+    }));
+    // 직접 선택 2팀: 뽑힌 옵션의 "이 구성 저장"에 포커스, 누르면 그 구성이 보드에 저장
+    for (let i = 0; i < 10; i++) await page.locator(`.member-card[data-index="${i}"]`).click();
+    await page.evaluate(() => { savedResults.length = 0; renderSavedBoard(); });
+    await page.click("#balanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    assert.equal(await page.locator("#spinBalanceBtn").isVisible(), true, "spin button in the direct balance modal");
+    assert.equal(await page.locator("#balanceSpinChips .spin-chip").count(), 3);
+    await page.click("#spinBalanceBtn");
+    const spinning = await spinState();
+    assert.ok([0, 1, 2].includes(spinning.pick), "pick decided on click");
+    assert.equal(spinning.spinning, true);
+    assert.equal(spinning.btnDisabled, true, "no double spin while rolling");
+    await page.waitForSelector("#balanceModalList .modal-option.is-picked", { timeout: 5000 });
+    const landed = await spinState();
+    assert.equal(landed.pick, spinning.pick, "lands on the option decided at click");
+    assert.deepEqual(landed.picked, [0, 1, 2].map(i => i === spinning.pick));
+    assert.deepEqual(landed.chips, landed.picked);
+    assert.equal(landed.badges, 1);
+    assert.equal(landed.spinning, false);
+    assert.ok(landed.text.includes(`옵션 ${spinning.pick + 1} 당첨`), landed.text);
+    assert.ok(landed.focus.includes("opt-save") && landed.focusOpt === String(spinning.pick), "focus on the picked option's save button");
+    const pickedKey = await page.evaluate(i => teamsKey(modalTrio[i].aIds.map(x => members[x]), modalTrio[i].bIds.map(x => members[x])), spinning.pick);
+    await page.keyboard.press("Enter");
+    assert.equal(await page.evaluate(() => savedResults.length), 1);
+    assert.equal(await page.evaluate(() => savedResults[0].key), pickedKey, "Enter saves the picked option");
+    // 다시 짜면 뽑기 표시가 사라짐
+    await page.click("#rerollBalanceBtn");
+    const afterReroll = await spinState();
+    assert.equal(afterReroll.pick, null);
+    assert.equal(afterReroll.badges, 0);
+    assert.equal(afterReroll.text, "");
+    // 돌아가는 중에 닫으면 멈추고, 다시 열면 깨끗한 상태
+    await page.click("#spinBalanceBtn");
+    await page.click("#balanceModalClose");
+    await page.waitForTimeout(2600);
+    await page.click("#balanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    const reopened = await spinState();
+    assert.equal(reopened.pick, null);
+    assert.equal(reopened.picked.some(Boolean), false, "no stray pick after closing mid-spin");
+    await page.click("#balanceModalClose");
+    await page.click("#deselectAllBtn");
+    // 모집 4팀: 뽑힌 옵션의 "이 구성 적용"에 포커스, 누르면 그 구성이 결과로 적용
+    await page.selectOption("#recruitmentSelect", "group20");
+    await page.click("#selectRecruitmentMembersBtn");
+    await page.click("#internalBalanceTeamBtn");
+    await page.waitForSelector("#balanceModal.open");
+    await page.click("#spinBalanceBtn");
+    const recruitPick = (await spinState()).pick;
+    await page.waitForSelector("#balanceModalList .modal-option.is-picked", { timeout: 5000 });
+    const recruitLanded = await spinState();
+    assert.ok(recruitLanded.focus.includes("opt-apply") && recruitLanded.focusOpt === String(recruitPick), "focus on the picked option's apply button");
+    assert.ok(recruitLanded.text.includes("확정돼요"), recruitLanded.text);
+    const recruitKey = await page.evaluate(i => recruitmentBalanceContext.candidates[i].key, recruitPick);
+    await page.keyboard.press("Enter");
+    assert.equal(await page.locator("#balanceModal").evaluate(el => el.classList.contains("open")), false);
+    assert.equal(await page.evaluate(() => lastRecruitmentResult.candidateKey), recruitKey, "Enter applies the picked candidate");
+    await page.click("#exitRecruitmentModeBtn");
+    console.log("PASS: random pick among balance options (direct save, recruitment apply), decided on click, keyboard Enter, reset on reroll and close");
+
     await page.setViewportSize({ width: 390, height: 844 });
     await page.selectOption("#recruitmentSelect", "group20");
     await page.click("#selectRecruitmentMembersBtn");

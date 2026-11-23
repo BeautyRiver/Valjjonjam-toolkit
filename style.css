@@ -2825,3 +2825,146 @@ html.modal-open body {
     font-size: 0.8rem;
   }
 }
+
+/* ===== 밸런스 후보 중 랜덤 뽑기: 옵션을 번갈아 비추다 하나에 멈춤 ===== */
+.spin-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: -4px 0 14px;
+}
+
+.spin-bar[hidden] {
+  display: none;
+}
+
+.spin-btn {
+  padding: 10px 16px;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.1);
+  border: 1px solid rgba(255, 209, 102, 0.45);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.spin-btn:not(:disabled):hover {
+  background: rgba(255, 209, 102, 0.18);
+  border-color: rgba(255, 209, 102, 0.7);
+}
+
+.spin-btn:focus-visible {
+  outline: 2px solid #ffd166;
+  outline-offset: 2px;
+}
+
+.spin-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.spin-chip {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 0.9rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 0.08s ease, color 0.08s ease, border-color 0.08s ease;
+}
+
+.spin-chip.is-spin-lit {
+  color: #1a1204;
+  background: #ffd166;
+  border-color: #ffd166;
+}
+
+.spin-chip.is-picked {
+  color: #1a1204;
+  background: #ffd166;
+  border-color: #fff3d1;
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.3), 0 0 18px rgba(255, 209, 102, 0.5);
+  animation: spinPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.spin-result {
+  margin: 0;
+  flex: 1 1 260px;
+  min-height: 1.4em;
+  color: #ffd166;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.modal-options .modal-option {
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, background 0.2s ease, filter 0.25s ease;
+}
+
+/* 돌아가는 동안: 비춘 옵션만 금색 테두리, 나머지는 살짝 어둡게 (빠르게 바뀜) */
+.modal-options.is-spinning .modal-option {
+  transition-duration: 0.06s;
+  filter: saturate(0.6) brightness(0.72);
+}
+
+.modal-options.is-spinning .modal-option.is-spin-lit {
+  filter: none;
+  border-color: #ffd166;
+  background: rgba(255, 209, 102, 0.06);
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.5), 0 0 26px rgba(255, 209, 102, 0.22);
+}
+
+/* 멈춘 뒤: 뽑힌 옵션 강조, 나머지는 어둡게 (다시 그리거나 한 번 더 뽑으면 풀림) */
+.modal-options.has-pick .modal-option:not(.is-picked) {
+  filter: saturate(0.55) brightness(0.62);
+}
+
+.modal-options .modal-option.is-picked,
+.modal-options .modal-option.is-picked:hover {
+  border-color: #ffd166;
+  background: rgba(255, 209, 102, 0.07);
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.7), 0 0 36px rgba(255, 209, 102, 0.3);
+}
+
+.opt-picked-badge {
+  display: inline-block;
+  margin: -3px 0 -3px 8px;   /* 옵션 머리 높이가 늘어 내용이 밀리지 않게 */
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: #1a1204;
+  background: #ffd166;
+  font-size: 0.8rem;
+  font-weight: 900;
+  vertical-align: 1px;
+  animation: spinPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-option.is-picked .opt-apply:not(:disabled),
+.modal-option.is-picked .opt-save:not(:disabled) {
+  animation: pickedPulse 1.1s ease-out 2;
+}
+
+@keyframes spinPop {
+  0%   { transform: scale(0.4); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pickedPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 209, 102, 0.75); }
+  100% { box-shadow: 0 0 0 14px rgba(255, 209, 102, 0); }
+}
+
+@media (max-width: 768px) {
+  .spin-btn {
+    flex: 1 1 100%;
+  }
+
+  .spin-result {
+    flex-basis: 0;
+    font-size: 0.82rem;
+  }
+}

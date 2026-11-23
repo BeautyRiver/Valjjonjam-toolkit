@@ -1117,6 +1117,7 @@ function renderModalTrio() {
   if (!modalTrio.length) {
     balanceModalListEl.innerHTML = `<div class="modal-empty">더 만들 수 있는 구성이 없어요.<br>저장 보드에서 몇 개 지우고 다시 시도해보세요.</div>`;
     syncFootButtons();
+    resetBalanceSpin();
     return;
   }
 
@@ -1147,6 +1148,7 @@ function renderModalTrio() {
   });
 
   updateModalSaveButtons();
+  resetBalanceSpin();
 }
 
 // 모달 저장 버튼들의 라벨/상태 갱신 (이 구성 저장 (n/5))
@@ -1227,6 +1229,7 @@ function openBalanceModal() {
 
 function closeBalanceModal() {
   recruitmentBalanceContext = null;
+  resetBalanceSpin();
   if (!balanceModalEl.classList.contains("open")) return;
   balanceModalEl.classList.remove("open");
   balanceModalEl.setAttribute("aria-hidden", "true");
@@ -1311,6 +1314,110 @@ rerollBalanceBtn.addEventListener("click", () => {
   balanceModalEl.querySelector(".modal-box")?.scrollTo({ top: 0, behavior: "smooth" });
   playDealAnimation(balanceModalListEl, { keepClass: true });
 });
+
+// ===== 후보 중 랜덤 뽑기 (직접 선택·모집 후보 모두) =====
+// 뽑힐 옵션은 누르는 순간 정하고(balanceSpinPick), 화면은 옵션을 번갈아 비추다 그 옵션에 멈추는 연출만 함.
+// 뽑힌 옵션의 원래 버튼(이 구성 적용 / 이 구성 저장)에 포커스를 줄 뿐, 적용·저장은 사람이 누름.
+const spinBalanceBtn = document.getElementById("spinBalanceBtn");
+const balanceSpinChipsEl = document.getElementById("balanceSpinChips");
+const balanceSpinResultEl = document.getElementById("balanceSpinResult");
+const SPIN_BALANCE_LABEL = "🎰 고민되면 랜덤 뽑기";
+let balanceSpinPick = null;   // 뽑힌 옵션 번호(0부터). 후보를 다시 그리면 null
+let balanceSpinTimers = [];
+
+function secureRandomInt(max) {
+  if (window.crypto?.getRandomValues) {
+    const value = new Uint32Array(1);
+    window.crypto.getRandomValues(value);
+    return value[0] % max;
+  }
+  return Math.floor(Math.random() * max);
+}
+
+function balanceCandidateCount() {
+  return recruitmentBalanceContext ? recruitmentBalanceContext.candidates.length : modalTrio.length;
+}
+
+function balanceOptionEls() {
+  return [...balanceModalListEl.querySelectorAll(".modal-option")];
+}
+
+// 후보 목록을 새로 그리거나 모달을 닫을 때: 진행 중인 뽑기를 멈추고 표시를 지움
+function resetBalanceSpin() {
+  balanceSpinTimers.forEach(clearTimeout);
+  balanceSpinTimers = [];
+  balanceSpinPick = null;
+  balanceModalListEl.classList.remove("is-spinning", "has-pick");
+  balanceOptionEls().forEach(el => el.classList.remove("is-spin-lit", "is-picked"));
+  balanceModalListEl.querySelectorAll(".opt-picked-badge").forEach(el => el.remove());
+  balanceSpinResultEl.textContent = "";
+  const count = balanceCandidateCount();
+  balanceSpinChipsEl.innerHTML = Array.from({ length: count }, (_, i) => `<span class="spin-chip">${i + 1}</span>`).join("");
+  spinBalanceBtn.textContent = SPIN_BALANCE_LABEL;
+  spinBalanceBtn.disabled = false;
+  spinBalanceBtn.closest(".spin-bar").hidden = count < 2;   // 후보가 하나뿐이면 고를 게 없음
+}
+
+function lightBalanceOption(index, className) {
+  balanceOptionEls().forEach((el, i) => el.classList.toggle(className, i === index));
+  balanceSpinChipsEl.querySelectorAll(".spin-chip").forEach((el, i) => el.classList.toggle(className, i === index));
+}
+
+function spinBalanceCandidates() {
+  const count = balanceCandidateCount();
+  if (count < 2 || balanceSpinTimers.length) return;
+  resetBalanceSpin();
+  const winner = secureRandomInt(count);
+  balanceSpinPick = winner;
+  spinBalanceBtn.disabled = true;
+  balanceModalListEl.classList.add("is-spinning");
+  balanceSpinResultEl.textContent = "두구두구…";
+  // 옵션 1부터 세 바퀴 돌고 뽑힌 옵션에서 멈춤. 한 칸씩 점점 느려짐 (전체 약 2초)
+  const steps = count * 3 + winner;
+  let at = 0;
+  for (let step = 0; step <= steps; step++) {
+    const progress = step / steps;
+    if (step) at += 55 + 330 * progress * progress;
+    const index = step % count;
+    balanceSpinTimers.push(setTimeout(() => lightBalanceOption(index, "is-spin-lit"), at));
+  }
+  balanceSpinTimers.push(setTimeout(() => revealBalanceSpin(winner), at + 380));
+}
+
+function revealBalanceSpin(winner) {
+  balanceSpinTimers = [];
+  balanceModalListEl.classList.remove("is-spinning");
+  balanceModalListEl.classList.add("has-pick");
+  lightBalanceOption(-1, "is-spin-lit");
+  lightBalanceOption(winner, "is-picked");
+  spinBalanceBtn.disabled = false;
+  spinBalanceBtn.textContent = "🎰 한 번 더 뽑기";
+  const option = balanceOptionEls()[winner];
+  if (!option) return;
+  const badge = document.createElement("span");
+  badge.className = "opt-picked-badge";
+  badge.textContent = "🎯 당첨";
+  option.querySelector(".opt-title")?.append(badge);
+
+  const n = winner + 1;
+  const action = option.querySelector(".opt-apply, .opt-save");
+  if (!action) balanceSpinResultEl.textContent = `🎯 옵션 ${n} 당첨!`;
+  else if (action.disabled) balanceSpinResultEl.textContent = `🎯 옵션 ${n} 당첨! (${action.textContent})`;
+  else balanceSpinResultEl.textContent = `🎯 옵션 ${n} 당첨! 옵션 ${n}의 ‘${action.textContent.replace(/\s*\(\d+\/\d+\)$/, "")}’을 누르면 ${recruitmentBalanceContext ? "확정돼요" : "보드에 담겨요"}`;
+
+  // 모바일처럼 옵션이 위아래로 쌓여 있으면 뽑힌 옵션 머리가 보이게 모달을 스크롤
+  const box = option.closest(".modal-box");
+  if (box) {
+    const boxTop = box.getBoundingClientRect().top;
+    const optionTop = option.getBoundingClientRect().top;
+    if (optionTop < boxTop || optionTop + 120 > box.getBoundingClientRect().bottom) {
+      box.scrollTo({ top: box.scrollTop + optionTop - boxTop - 12, behavior: "smooth" });
+    }
+  }
+  if (action && !action.disabled) action.focus({ preventScroll: true });
+}
+
+spinBalanceBtn.addEventListener("click", spinBalanceCandidates);
 
 // 위 3개 후보 중 점수차가 가장 작은 구성을 저장
 saveMinDiffBtn.addEventListener("click", () => {
@@ -2030,6 +2137,7 @@ function renderRecruitmentBalanceCandidates() {
 
   if (!context.candidates.length) {
     balanceModalListEl.innerHTML = `<div class="modal-empty">팀 구성을 만들지 못했어요. 선택 인원을 확인한 뒤 다시 시도해주세요.</div>`;
+    resetBalanceSpin();
     return;
   }
   balanceModalListEl.innerHTML = context.candidates.map((candidate, index) => {
@@ -2055,6 +2163,7 @@ function renderRecruitmentBalanceCandidates() {
       closeBalanceModal();
     });
   });
+  resetBalanceSpin();
 }
 
 function renderRecruitmentResult(recruitment, analysis, candidate, scoreMode, method) {

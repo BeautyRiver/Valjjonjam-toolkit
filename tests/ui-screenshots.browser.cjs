@@ -90,6 +90,13 @@ async function run() {
       await page.waitForSelector("#balanceModal.open");
       await page.waitForTimeout(500);
       await shot(page, `${prefix}-modal-2teams.png`);
+      // 후보 중 랜덤 뽑기: 돌아가는 중, 멈춘 뒤
+      await page.click("#spinBalanceBtn");
+      await page.waitForTimeout(700);
+      await shot(page, `${prefix}-modal-spinning.png`);
+      await page.waitForSelector("#balanceModalList .modal-option.is-picked", { timeout: 5000 });
+      await page.waitForTimeout(700);
+      await shot(page, `${prefix}-modal-spin-picked.png`);
       await page.locator("#balanceModalList .opt-save").first().click();
       await page.click("#balanceModalClose");
       await page.click("#savedBoard .saved-load");
